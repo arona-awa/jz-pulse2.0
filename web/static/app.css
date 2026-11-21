@@ -1735,8 +1735,21 @@ body.tip-open { overflow: hidden; }
 }
 .act.coin-btn img, .act.coin-stat img { width: 17px; height: 17px; }
 .act.coin-btn:hover { color: var(--clv-accent); }
-.act.coin-btn.is-tipped { cursor: default; opacity: .62; }
-.act.coin-btn.is-tipped:hover { color: inherit; }
+.act.coin-btn.is-tipped, .act.coin-stat.is-tipped { cursor: default; opacity: .92; color: #e5484d; }
+.act.coin-btn.is-tipped:hover { color: #e5484d; }
+.act.coin-btn.is-tipped .coin-count, .act.coin-stat.is-tipped .coin-count { color: #e5484d; }
+.act.coin-btn.is-tipped img, .act.coin-stat.is-tipped img {
+  filter: drop-shadow(0 0 4px rgba(229, 72, 77, .38));
+  animation: coin-tipped-pop .42s ease-out;
+}
+@keyframes coin-tipped-pop {
+  0% { transform: scale(.82); }
+  55% { transform: scale(1.16); }
+  100% { transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .act.coin-btn.is-tipped img, .act.coin-stat.is-tipped img { animation: none; }
+}
 .coin-count { font-variant-numeric: tabular-nums; }
 .card-foot .act.coin-btn img, .card-foot .act.coin-stat img { width: 15px; height: 15px; }
 

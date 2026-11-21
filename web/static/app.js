@@ -119,6 +119,27 @@
 
   /* ---------------- 投币支持：1/2 枚、上滑/点击投币、砖块闪电动画 ---------------- */
 
+  function coinIconSrc(tipped) {
+    var file = tipped ? 'coin-red.svg' : 'coin.svg';
+    return '/static/' + file + '?v=' + ((window.CLV && window.CLV.version) || '');
+  }
+
+  function isTippedAuthor(userID) {
+    var n = Number(userID) || 0;
+    return !!n && (window.CLV && (window.CLV.tippedAuthors || []).indexOf(n) >= 0);
+  }
+
+  // 已投币状态：图标换红色、禁用再次投币，并保留“已支持”提示。
+  function markCoinTipped(node) {
+    if (!node) return;
+    node.classList.add('is-tipped');
+    node.removeAttribute('data-tip');
+    node.title = '已支持过该作者';
+    node.setAttribute('aria-label', '已支持过该作者');
+    var img = node.querySelector('img');
+    if (img) img.src = coinIconSrc(true);
+  }
+
   function initTip() {
     var modal = document.getElementById('tip-modal');
     if (!modal) return;
@@ -389,12 +410,8 @@
       if (!n) return;
       var list = window.CLV.tippedAuthors = window.CLV.tippedAuthors || [];
       if (list.indexOf(n) < 0) list.push(n);
-      document.querySelectorAll('[data-tip][data-user="' + n + '"]').forEach(function (btn) {
-        btn.removeAttribute('data-tip');
-        btn.classList.add('is-tipped');
-        btn.title = '已支持过该作者';
-        btn.setAttribute('aria-label', '已支持过该作者');
-      });
+      document.querySelectorAll('.coin-btn[data-user="' + n + '"], .coin-stat[data-user="' + n + '"]')
+        .forEach(markCoinTipped);
     }
     (window.CLV.tippedAuthors || []).forEach(function (id) { disableTipAuthor(id); });
     window.addEventListener('resize', alignSelection);
@@ -525,8 +542,8 @@
     cm.appendChild(document.createTextNode(p.comment_count || 0));
     acts.appendChild(cm);
     var coinCount = Number(p.coins) || 0;
-    var canTip = window.CLV && window.CLV.userID && p.user_id && Number(p.user_id) !== Number(window.CLV.userID) &&
-      (window.CLV.tippedAuthors || []).indexOf(Number(p.user_id)) < 0;
+    var tipped = isTippedAuthor(p.user_id);
+    var canTip = window.CLV && window.CLV.userID && p.user_id && Number(p.user_id) !== Number(window.CLV.userID) && !tipped;
     var coinEl = canTip ? el('button', 'act coin-btn') : el('span', 'act coin-stat');
     if (canTip) {
       coinEl.type = 'button';
@@ -535,11 +552,16 @@
       coinEl.dataset.user = p.user_id;
       coinEl.title = '投币支持';
       coinEl.setAttribute('aria-label', '投币支持');
+    } else if (tipped) {
+      coinEl.classList.add('is-tipped');
+      coinEl.dataset.user = p.user_id;
+      coinEl.title = '已支持过该作者';
+      coinEl.setAttribute('aria-label', '已支持过该作者');
     } else {
       coinEl.title = '帖子投币数';
     }
     var coinImg = el('img');
-    coinImg.src = '/static/coin.svg?v=' + ((window.CLV && window.CLV.version) || '');
+    coinImg.src = coinIconSrc(tipped);
     coinImg.alt = '';
     coinEl.appendChild(coinImg);
     var coinNum = el('span', 'coin-count', coinCount);
