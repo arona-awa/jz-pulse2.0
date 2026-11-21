@@ -12,6 +12,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"clearlove/internal/config"
@@ -231,6 +232,30 @@ func formInt64(r *http.Request, key string) int64 {
 	return n
 }
 
+var (
+	dailyCoinMu   sync.Mutex
+	dailyCoinDate string
+	dailyCoinSeen map[int64]bool
+)
+
+// shouldCheckDailyCoin 每个用户每天只触发一次每日硬币检查。
+// 聊天轮询等高频请求此前会在每次 CurrentUser 时查询并更新 coin_tip_day，
+// SQLite 单连接下会造成不必要的写压力。按天缓存后，后续请求直接跳过。
+func shouldCheckDailyCoin(uid int64) bool {
+	today := models.Today()
+	dailyCoinMu.Lock()
+	defer dailyCoinMu.Unlock()
+	if dailyCoinDate != today || dailyCoinSeen == nil {
+		dailyCoinDate = today
+		dailyCoinSeen = make(map[int64]bool)
+	}
+	if dailyCoinSeen[uid] {
+		return false
+	}
+	dailyCoinSeen[uid] = true
+	return true
+}
+
 // CurrentUser 从签名 Cookie 解析当前登录用户
 func CurrentUser(r *http.Request) *models.User {
 	c, err := r.Cookie("clv_user")
@@ -246,8 +271,11 @@ func CurrentUser(r *http.Request) *models.User {
 		return nil
 	}
 	// 每日自动 +1 硬币；多天未访问时在本次访问补齐。
-	if n := models.AwardDailyCoin(u.ID); n > 0 {
-		u.CoinTenths += n
+	// 用进程内按天标记避免聊天轮询等请求反复查/写数据库。
+	if shouldCheckDailyCoin(u.ID) {
+		if n := models.AwardDailyCoin(u.ID); n > 0 {
+			u.CoinTenths += n
+		}
 	}
 	return u
 }

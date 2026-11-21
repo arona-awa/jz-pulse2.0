@@ -262,6 +262,15 @@ html[data-clv-cols="3"] .masonry { columns: 3; }
 
 .load-state { text-align: center; color: var(--clv-muted); font-size: 13px; padding: 16px 0; }
 .load-state:empty { padding: 0; }
+.load-state.is-retry { cursor: pointer; color: var(--clv-accent); }
+.load-state.is-loading::before {
+  content: ""; display: inline-block; width: 12px; height: 12px; margin-right: 6px;
+  border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%;
+  vertical-align: -2px; animation: load-spin .7s linear infinite;
+}
+.act.like-btn[disabled] { opacity: .55; pointer-events: none; }
+@keyframes load-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .load-state.is-loading::before { animation: none; } }
 .sentinel { height: 1px; }
 
 /* 悬浮发帖按钮 */

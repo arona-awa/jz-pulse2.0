@@ -628,6 +628,9 @@
 
     function finish(msg) {
       done = true;
+      state.classList.remove('is-loading', 'is-retry');
+      state.removeAttribute('role');
+      state.removeAttribute('tabindex');
       state.textContent = msg;
       if (sentinel) sentinel.remove();
       if (io) { io.disconnect(); io = null; }
@@ -636,12 +639,20 @@
     function load() {
       if (loading || done) return;
       loading = true;
+      state.classList.remove('is-retry');
+      state.classList.add('is-loading');
+      state.setAttribute('role', 'status');
+      state.removeAttribute('tabindex');
       state.textContent = '加载中...';
       api('/api/v1/posts?before=' + last + '&limit=' + PAGE + '&topic=' + encodeURIComponent(topic))
         .then(function (r) {
           loading = false;
+          state.classList.remove('is-loading');
           if (!r || !r.ok) {
-            state.textContent = '加载失败，请刷新页面重试';
+            state.classList.add('is-retry');
+            state.setAttribute('role', 'button');
+            state.tabIndex = 0;
+            state.textContent = '加载失败，点击重试';
             return;
           }
           var posts = r.posts || [];
@@ -657,9 +668,23 @@
         })
         .catch(function () {
           loading = false;
-          state.textContent = '网络异常，请稍后重试';
+          state.classList.remove('is-loading');
+          state.classList.add('is-retry');
+          state.setAttribute('role', 'button');
+          state.tabIndex = 0;
+          state.textContent = '网络异常，点击重试';
         });
     }
+
+    state.addEventListener('click', function () {
+      if (state.classList.contains('is-retry') && !loading && !done) load();
+    });
+    state.addEventListener('keydown', function (e) {
+      if ((e.key === 'Enter' || e.key === ' ') && state.classList.contains('is-retry')) {
+        e.preventDefault();
+        load();
+      }
+    });
 
     if (sentinel && 'IntersectionObserver' in window) {
       io = new IntersectionObserver(function (entries) {
@@ -679,6 +704,8 @@
     var like = ev.target.closest('.like-btn');
     if (like) {
       ev.preventDefault();
+      if (like.disabled) return;
+      like.disabled = true;
       var id = like.dataset.id;
       api('/api/v1/posts/' + id + '/like', { method: 'POST' })
         .then(function (r) {
@@ -686,7 +713,9 @@
           var span = like.querySelector('.like-count');
           if (span) span.textContent = r.likes;
           like.classList.toggle('liked', !!r.liked);
-        });
+        })
+        .catch(function () { toast('网络异常，请稍后重试'); })
+        .then(function () { like.disabled = false; });
       return;
     }
     var rep = ev.target.closest('.report-btn');

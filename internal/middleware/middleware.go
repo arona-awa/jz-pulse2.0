@@ -54,6 +54,15 @@ func Use(next http.Handler) http.Handler {
 			return
 		}
 
+		// 静态资源不走 CSRF/Cookie/插件中间件：避免每个资源都 Set-Cookie，
+		// 否则 Cloudflare 会判定为动态响应（cf-cache-status: BYPASS），
+		// 浏览器和边缘节点都无法缓存 CSS/JS/图片。
+		if isAssetPath(r.URL.Path) {
+			setAssetCache(w, r)
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		// 应用型插件中间件（http.before）：在 CSRF 校验之前执行，可短路响应
 		if plugin.HasApps() && !strings.HasPrefix(r.URL.Path, "/static/") && !strings.HasPrefix(r.URL.Path, "/uploads/") {
 			if res := plugin.RunMiddlewareBefore(map[string]any{
@@ -149,6 +158,35 @@ func Use(next http.Handler) http.Handler {
 		}
 		util.Log("info", "%s %s %s %s", r.Method, r.URL.Path, r.RemoteAddr, time.Since(start).Round(time.Millisecond))
 	})
+}
+
+// isAssetPath 判断是否为无需会话/CSRF 的只读静态资源。
+func isAssetPath(p string) bool {
+	return strings.HasPrefix(p, "/static/") ||
+		strings.HasPrefix(p, "/uploads/") ||
+		p == "/theme.css" || p == "/favicon.svg" || p == "/favicon.ico"
+}
+
+// setAssetCache 为静态资源设置浏览器/边缘缓存。
+// /static/ 的资源在模板中带 ?v=版本号，可安全长缓存；未带版本时降为 1 天。
+func setAssetCache(w http.ResponseWriter, r *http.Request) {
+	p := r.URL.Path
+	switch {
+	case strings.HasPrefix(p, "/static/"):
+		if r.URL.Query().Get("v") != "" {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		} else {
+			w.Header().Set("Cache-Control", "public, max-age=86400")
+		}
+	case strings.HasPrefix(p, "/uploads/"):
+		// 上传文件名随机，内容不会原地变化，可长期缓存。
+		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	case p == "/theme.css":
+		// 主题可在后台即时切换，使用短缓存。
+		w.Header().Set("Cache-Control", "public, max-age=300")
+	case p == "/favicon.svg" || p == "/favicon.ico":
+		w.Header().Set("Cache-Control", "public, max-age=604800")
+	}
 }
 
 // statusWriter 记录响应状态码（http.after 使用）
