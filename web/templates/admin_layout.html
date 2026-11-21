@@ -1,0 +1,88 @@
+{{define "admin_layout.html"}}<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="csrf" content="{{.csrf}}">
+<meta name="clv-version" content="{{.clvVersion}}">
+<script>window.CLV=window.CLV||{hooks:{cardHtml:[],cardEl:[],afterRender:[]}};</script>
+<title>管理后台 - {{.site}}</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/app.css?v={{.clvVersion}}">
+{{.admin_head_end}}
+</head>
+<body class="admin-body">
+{{if .admin}}
+<aside class="sidebar" id="sidebar">
+  <div class="side-brand">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-8-5.2-8-10.4C4 7 6.2 5 8.8 5c1.6 0 2.7.8 3.2 1.7C12.5 5.8 13.6 5 15.2 5 17.8 5 20 7 20 10.6 20 15.8 12 21 12 21z"/></svg>
+    <span>管理后台</span>
+  </div>
+  <nav class="side-nav">
+    <a href="/admin" class="{{if eq .Page "pg_dashboard"}}active{{end}}">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="5" rx="1.5"/><rect x="13" y="10" width="8" height="11" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/></svg>仪表盘</a>
+    {{if .admin.HasPerm "posts"}}<a href="/admin/posts" class="{{if eq .Page "pg_admin_posts"}}active{{end}}">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h5"/></svg>帖子管理</a>{{end}}
+    {{if .admin.HasPerm "settings"}}<a href="/admin/settings" class="{{if eq .Page "pg_admin_settings"}}active{{end}}">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5 5l2.1 2.1M16.9 16.9L19 19M19 5l-2.1 2.1M7.1 16.9L5 19"/></svg>网站设置</a>{{end}}
+    {{if .admin.HasPerm "settings"}}<a href="/admin/background" class="{{if eq .Page "pg_admin_background"}}active{{end}}">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 15l-5-5L5 20"/></svg>背景</a>{{end}}
+    {{if .admin.HasPerm "reports"}}<a href="/admin/reports" class="{{if eq .Page "pg_admin_reports"}}active{{end}}">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 21V4M5 5h13l-2.5 4L18 13H5"/></svg>举报管理</a>{{end}}
+    {{if .admin.HasPerm "users"}}<a href="/admin/users" class="{{if eq .Page "pg_admin_users"}}active{{end}}">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 8.5a3 3 0 1 1 0 6M18 20c0-2 .8-3.8 2-5"/></svg>用户管理</a>{{end}}
+    {{if .admin.HasPerm "admins"}}<a href="/admin/admins" class="{{if eq .Page "pg_admin_admins"}}active{{end}}">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 3v6c0 5-3.4 8.2-8 9-4.6-.8-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>管理员管理</a>{{end}}
+    {{if .admin.HasPerm "notices"}}<a href="/admin/notices" class="{{if eq .Page "pg_admin_notices"}}active{{end}}">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l18-7-7 18-2.5-7.5L3 11z"/></svg>公告与话题</a>{{end}}
+    {{if .admin.HasPerm "plugins"}}<a href="/admin/plugins" class="{{if eq .Page "pg_admin_plugins"}}active{{end}}">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 3h4v4a2 2 0 1 0 4 0h3v4h-4a2 2 0 1 0 0 4h4v4h-4a2 2 0 1 0-4 0H9v-4a2 2 0 1 0-4 0H3v-4h4a2 2 0 1 0 0-4H3V7h4a2 2 0 1 0 4 0z"/></svg>插件管理</a>{{end}}
+    {{if .admin.HasPerm "plugins"}}<a href="/admin/store" class="{{if eq .Page "pg_admin_store"}}active{{end}}">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8l1.6-4h12.8L20 8"/><path d="M4 8h16v12H4z"/><path d="M9 12h6"/></svg>插件商店</a>{{end}}
+    {{if .admin.HasPerm "plugins"}}<a href="/admin/plugin-logs" class="{{if eq .Page "pg_admin_plugin_logs"}}active{{end}}">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3h9l5 5v13H6z"/><path d="M15 3v5h5"/><path d="M9 13h7M9 17h5"/></svg>插件日志</a>{{end}}
+    {{if .admin.HasPerm "api"}}<a href="/admin/apikeys" class="{{if eq .Page "pg_admin_apikeys"}}active{{end}}">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M14 9l2.5 2.5"/></svg>API 接口</a>{{end}}
+    <a href="/admin/about" class="{{if eq .Page "pg_admin_about"}}active{{end}}">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>关于</a>
+    {{if .admin.HasPerm "settings"}}<a href="/admin/migrate" class="{{if eq .Page "pg_admin_migrate"}}active{{end}}">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5.5" rx="7" ry="2.8"/><path d="M5 5.5v13c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8v-13"/><path d="M5 12c0 1.5 3.1 2.8 7 2.8s7-1.3 7-2.8"/></svg>数据迁移</a>{{end}}
+    {{if .admin.HasPerm "settings"}}<a href="/admin/update" class="{{if eq .Page "pg_admin_update"}}active{{end}}">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 12a8 8 0 1 1-2.3-5.7M20 4v5h-5"/></svg>检查更新</a>{{end}}
+    {{range .plugin_menus}}{{if or (eq .Perm "") ($.admin.HasPerm .Perm)}}<a href="/admin/plugins/{{.Slug}}{{.Path}}">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/></svg>{{.Label}}</a>{{end}}{{end}}
+  </nav>
+  {{.admin_sidebar_after}}
+  <div class="side-foot">
+    <a href="/" target="_blank">查看前台</a>
+    <a href="/admin/logout">退出登录</a>
+  </div>
+</aside>
+<header class="admin-top">
+  <button type="button" class="icon-btn" id="side-toggle" aria-label="菜单">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+  </button>
+  <span class="admin-title">{{.site}} · {{.admin.Username}}</span>
+  <div class="admin-top-actions">
+    <button type="button" class="btn btn-ghost" onclick="openDonate()">捐赠开发者</button>
+  </div>
+</header>
+{{end}}
+<main class="admin-main">
+{{pageContent .Page .}}
+</main>
+
+<div class="modal" id="donate-modal" hidden>
+  <div class="modal-mask" onclick="closeDonate()"></div>
+  <div class="modal-box">
+    <h3>捐赠开发者</h3>
+    <p class="muted">感谢您的支持，这将帮助我们持续维护与改进。</p>
+    {{if .donate}}<img class="donate-img" src="{{.donate}}" alt="捐赠二维码">{{else}}<p class="empty">未配置捐赠图片</p>{{end}}
+    <button class="btn btn-ghost btn-block" type="button" onclick="closeDonate()">关闭</button>
+  </div>
+</div>
+
+<script src="/static/app.js?v={{.clvVersion}}" defer></script>
+{{.admin_body_end}}
+</body>
+</html>{{end}}

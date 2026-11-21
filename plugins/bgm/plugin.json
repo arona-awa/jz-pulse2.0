@@ -1,0 +1,48 @@
+{
+  "name": "bgm",
+  "version": "1.0.0",
+  "author": "ClearLove",
+  "description": "背景音乐：管理员上传音乐后，访客打开站点即可听到背景音乐，支持自动播放、循环、音量与按钮位置设置",
+  "requires": "2.0.0",
+  "config": [
+    {
+      "key": "music",
+      "label": "背景音乐文件",
+      "type": "audio",
+      "default": "",
+      "help": "支持 mp3 / m4a / aac / ogg / opus / wav / flac，单个文件不超过 20MB；重新上传会自动删除旧文件"
+    },
+    {
+      "key": "autoplay",
+      "label": "自动播放",
+      "type": "switch",
+      "default": "1",
+      "help": "受浏览器自动播放策略限制：被拦截时按钮旁会出现提示，访客点击一次即可播放"
+    },
+    {
+      "key": "loop",
+      "label": "循环播放",
+      "type": "switch",
+      "default": "1",
+      "help": "关闭后音乐播放完自动停止"
+    },
+    {
+      "key": "volume",
+      "label": "默认音量（0-100）",
+      "type": "number",
+      "default": "35",
+      "help": "访客可通过悬浮按钮自行开关，其选择会被记住"
+    },
+    {
+      "key": "pos",
+      "label": "悬浮按钮位置",
+      "type": "select",
+      "default": "右下",
+      "options": ["右下", "左下"],
+      "help": "按钮会自动避开同侧右下角的发帖悬浮按钮"
+    }
+  ],
+  "hooks": [
+    { "hook": "footer_html", "type": "html", "html": "@player.html" }
+  ]
+}

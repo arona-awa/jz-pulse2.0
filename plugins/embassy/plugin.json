@@ -1,0 +1,24 @@
+{
+  "kind": "app",
+  "name": "友校大使馆",
+  "slug": "embassy",
+  "version": "1.0.0",
+  "author": "ClearLove",
+  "description": "管理员在后台登记各友校大使账号；发帖人使用大使专属昵称时弹窗验证身份，验证通过后帖子自动带上「xx学校大使官方认证」标识",
+  "requires": "2.1.0",
+  "runtime": {
+    "engine": "js",
+    "entry": "main.js",
+    "timeout_ms": 3000
+  },
+  "permissions": ["db"],
+  "config": [
+    {
+      "key": "valid_minutes",
+      "label": "验证有效期（分钟）",
+      "type": "number",
+      "default": "10",
+      "help": "大使验证通过后，在该时长内以大使昵称发帖会自动携带官方认证标识"
+    }
+  ]
+}

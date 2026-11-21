@@ -1,0 +1,32 @@
+# 运行时数据与用户内容
+/data/
+/uploads/
+/dist/
+/config.json
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# 构建产物
+*.exe
+clearlove-linux-amd64
+clearlove-cloud-linux-amd64
+clearlove-*-linux-amd64
+jz-pulse
+jz-pulse-*
+*.zip
+
+# 本地开发/备份
+.env
+.env.*
+backups/
+.cloud/
+cloud/
+旧版本/
+.codebuddy/
+.mailmap
+
+# 系统文件
+.DS_Store
+Thumbs.db

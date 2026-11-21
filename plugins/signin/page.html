@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>每日签到</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/theme.css">
+</head>
+<body>
+<main class="container">
+  <h1 class="page-title">每日签到</h1>
+  <div class="card">
+    <p>累计签到 <strong>{{.days}}</strong> 天 · 累计积分 <strong>{{.points}}</strong></p>
+    {{if .done}}
+    <p class="muted">今天已经签到过了，明天再来～</p>
+    {{else}}
+    <form method="post" action="/x/signin/do">
+      <input type="hidden" name="_csrf" value="{{.csrf}}">
+      <button class="btn btn-primary" type="submit">立即签到（+{{.gain}}）</button>
+    </form>
+    {{end}}
+    <p style="margin-top:14px">
+      <a href="/x/signin/rank">查看签到榜</a> ·
+      <a href="/">返回首页</a>
+    </p>
+  </div>
+</main>
+</body>
+</html>

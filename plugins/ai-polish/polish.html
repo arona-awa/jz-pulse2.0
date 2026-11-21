@@ -1,0 +1,126 @@
+<!-- AI 语句美化（应用型插件 ai-polish 静态注入；仅在发帖页生效） -->
+<script>
+(function () {
+  var form = document.getElementById('compose-form');
+  if (!form) return;
+  var ta = form.querySelector('textarea[name="content"]');
+  if (!ta) return;
+
+  var API = '/x/ai-polish';
+  var state = { label: 'AI 美化', maxChars: 600, busy: false, lastText: '' };
+
+  // 探测插件是否可用（未接入 AI / 需登录时按钮不出现）
+  fetch(API + '/config', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+    .then(function (r) { return r.json(); })
+    .then(function (cfg) {
+      if (!cfg || !cfg.ok || !cfg.available) return;
+      state.label = cfg.label || state.label;
+      state.maxChars = cfg.max_chars || state.maxChars;
+      build();
+    })
+    .catch(function () { });
+
+  function build() {
+    var bar = document.createElement('div');
+    bar.className = 'ai-polish-bar';
+    bar.style.cssText = 'display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px';
+
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-ghost ai-polish-btn';
+    btn.style.cssText = 'display:inline-flex;align-items:center;gap:6px';
+    var icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    icon.setAttribute('viewBox', '0 0 24 24');
+    icon.setAttribute('width', '16');
+    icon.setAttribute('height', '16');
+    icon.setAttribute('fill', 'none');
+    icon.setAttribute('stroke', 'currentColor');
+    icon.setAttribute('stroke-width', '2');
+    var p1 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p1.setAttribute('d', 'M12 3l1.8 4.6L18.5 9l-4.7 1.4L12 15l-1.8-4.6L5.5 9l4.7-1.4z');
+    var p2 = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    p2.setAttribute('d', 'M18.5 15.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z');
+    icon.appendChild(p1);
+    icon.appendChild(p2);
+    var label = document.createElement('span');
+    label.textContent = state.label;
+    btn.appendChild(icon);
+    btn.appendChild(label);
+
+    var tip = document.createElement('span');
+    tip.style.cssText = 'font-size:12px';
+
+    var undo = document.createElement('button');
+    undo.type = 'button';
+    undo.className = 'mini-btn';
+    undo.textContent = '撤销';
+    undo.hidden = true;
+
+    bar.appendChild(btn);
+    bar.appendChild(tip);
+    bar.appendChild(undo);
+    // 插到「内容」这一整块（label）之后独立成行；若直接插在 textarea 后会落在 label 内受其排版影响
+    var anchor = ta.closest('label') || ta;
+    anchor.parentNode.insertBefore(bar, anchor.nextSibling);
+
+    btn.addEventListener('click', function () { run(btn, label, tip, undo); });
+    undo.addEventListener('click', function () {
+      ta.value = state.lastText;
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+      undo.hidden = true;
+      say(tip, '已恢复原文', false);
+    });
+  }
+
+  function run(btn, label, tip, undo) {
+    if (state.busy) return;
+    var text = (ta.value || '').trim();
+    if (text.length < 2) { say(tip, '请先输入内容', true); return; }
+    if (text.length > state.maxChars) { say(tip, '内容超过 ' + state.maxChars + ' 字，请分段美化', true); return; }
+
+    state.busy = true;
+    btn.disabled = true;
+    label.textContent = '美化中…';
+    tip.textContent = '';
+    undo.hidden = true;
+
+    request('POST', API + '/polish', { text: text })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (!res || !res.ok) { say(tip, (res && res.msg) || '美化失败，请稍后再试', true); return; }
+        state.lastText = ta.value;
+        ta.value = res.text;
+        ta.dispatchEvent(new Event('input', { bubbles: true }));
+        undo.hidden = false;
+        say(tip, '已完成美化', false);
+      })
+      .catch(function () { say(tip, '网络异常，请稍后再试', true); })
+      .then(function () {
+        state.busy = false;
+        btn.disabled = false;
+        label.textContent = state.label;
+      });
+  }
+
+  // 不依赖 app.js 的加载时机：直接带 CSRF 头请求
+  function request(method, url, body) {
+    var csrf = (document.querySelector('meta[name="csrf"]') || {}).content || '';
+    var opts = {
+      method: method,
+      headers: { 'X-CSRF-Token': csrf, 'X-Requested-With': 'XMLHttpRequest' }
+    };
+    if (body !== undefined) {
+      opts.headers['Content-Type'] = 'application/json';
+      opts.body = JSON.stringify(body);
+    }
+    return fetch(url, opts);
+  }
+
+  function say(el, msg, isErr) {
+    el.textContent = msg;
+    el.style.color = isErr ? 'var(--clv-danger, #d9534f)' : 'var(--clv-muted, #8a8f9c)';
+    clearTimeout(el._t);
+    el._t = setTimeout(function () { el.textContent = ''; }, 4000);
+  }
+})();
+</script>

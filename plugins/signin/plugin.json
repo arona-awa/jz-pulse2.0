@@ -1,0 +1,31 @@
+{
+  "kind": "app",
+  "name": "每日签到",
+  "slug": "signin",
+  "version": "1.0.0",
+  "author": "ClearLove",
+  "description": "应用型插件示例：自定义数据表 + 前台页面 + 后台管理页 + 定时任务 + UI 注入，完全不使用声明式钩子",
+  "requires": "2.1.0",
+  "runtime": {
+    "engine": "js",
+    "entry": "main.js",
+    "timeout_ms": 1000
+  },
+  "permissions": ["db", "settings.read", "site.read"],
+  "config": [
+    {
+      "key": "points",
+      "label": "每次签到积分",
+      "type": "number",
+      "default": "5",
+      "help": "签到一次获得的积分数量"
+    },
+    {
+      "key": "card_badge",
+      "label": "卡片标识文案",
+      "type": "text",
+      "default": "已签到",
+      "help": "前台帖子卡片上显示的标识文字"
+    }
+  ]
+}

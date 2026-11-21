@@ -1,0 +1,29 @@
+/* ===================================================================
+   ClearLove 表白墙 默认主题（theme: default）
+   -------------------------------------------------------------------
+   主题通过 CSS 变量 + 样式覆盖实现。自定义主题请创建
+   data/themes/<name>/theme.json 与 style.css，详见 docs/THEME.md
+   =================================================================== */
+
+:root {
+  /* 主色与辅助色 */
+  --clv-accent: #ff7ba9;
+  --clv-accent-2: #8f7bff;
+  --clv-accent-soft: rgba(255, 123, 169, .12);
+
+  /* 背景与卡片 */
+  --clv-bg: #f6f7fb;
+  --clv-bg-image: none;          /* 由后台设置或主题覆盖 */
+  --clv-card: #ffffff;
+
+  /* 文字 */
+  --clv-text: #23262f;
+  --clv-muted: #8a8f9c;
+  --clv-border: #eceef4;
+
+  /* 形态 */
+  --clv-radius: 16px;
+  --clv-radius-sm: 10px;
+  --clv-shadow: 0 2px 14px rgba(35, 38, 47, .06);
+  --clv-font: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", "Noto Sans CJK SC", sans-serif;
+}

@@ -1,0 +1,112 @@
+{{define "layout.html"}}<!DOCTYPE html>
+<html lang="zh-CN" data-clv-theme="{{.prefs.Theme}}" data-clv-cols="{{.prefs.Columns}}" data-clv-cz-mode="{{if eq .prefs.Theme "dark"}}dark{{else}}light{{end}}" style="--clv-font-scale: {{.prefs.FontScale}}%">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="csrf" content="{{.csrf}}">
+<meta name="clv-version" content="{{.clvVersion}}">
+<meta name="clv-user-avatar" content="{{if .user}}{{.user.Avatar}}{{end}}">
+<script>window.CLV=window.CLV||{hooks:{cardHtml:[],cardEl:[],afterRender:[]}};
+window.CLV.userID={{if .user}}{{.user.ID}}{{else}}0{{end}};
+window.CLV.csrf='{{.csrf}}';
+window.CLV.coinBalance={{if .user}}{{.user.CoinTenths}}{{else}}0{{end}};
+window.CLV.version='{{.clvVersion}}';
+window.CLV.tippedAuthors={{.tippedAuthors}};</script>
+<script>
+try {
+  if (sessionStorage.getItem('clv_splash_seen') === '1') document.documentElement.classList.add('splash-skip');
+} catch (e) {}
+setTimeout(function () {
+  var s = document.getElementById('site-splash');
+  if (s) { s.style.display = 'none'; document.body.classList.remove('splash-on'); }
+}, 7000);
+</script>
+<noscript><style>#site-splash{display:none!important}</style></noscript>
+<title>{{.site}}</title>
+<link rel="icon" href="/static/favicon.ico?v={{.clvVersion}}" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="/static/favicon-32x32.png?v={{.clvVersion}}">
+<link rel="icon" type="image/png" sizes="16x16" href="/static/favicon-16x16.png?v={{.clvVersion}}">
+<link rel="icon" type="image/png" sizes="192x192" href="/static/favicon-192x192.png?v={{.clvVersion}}">
+<link rel="apple-touch-icon" sizes="180x180" href="/static/apple-touch-icon.png?v={{.clvVersion}}">
+<link rel="stylesheet" href="/static/app.css?v={{.clvVersion}}">
+<link rel="stylesheet" href="/theme.css?v={{.clvVersion}}">
+{{.head_end}}
+</head>
+<body class="{{if ne .Page "pg_install"}}has-capsule-nav{{end}}{{if .bg}} has-site-bg{{end}}">
+{{if and (ne .Page "pg_install") (ne .Page "pg_terms") (ne .Page "pg_privacy") (ne .Page "pg_manual")}}
+<div id="site-splash" role="img" aria-label="{{.site}} 开屏">
+  <img src="/static/splash.webp?v={{.clvVersion}}" alt="" width="1200" height="1200" decoding="async" fetchpriority="high">
+</div>
+{{end}}
+{{if .bg}}<div class="site-bg" style="background-image:url('{{.bg}}')"></div>{{end}}
+{{.header_html}}
+
+{{if .notice}}
+<div class="notice-bar" id="notice-bar" data-nid="{{.notice.id}}">
+  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l18-7-7 18-2.5-7.5L3 11z"/></svg>
+  <div class="notice-body"><strong>{{.notice.title}}</strong><span>{{.notice.content}}</span></div>
+  <button type="button" class="notice-close" aria-label="关闭公告" onclick="dismissNotice()"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2.5" fill="none"><path d="M5 5l14 14M19 5L5 19"/></svg></button>
+</div>
+{{end}}
+
+<header class="topbar">
+  <a class="brand" href="/">{{.site}}</a>
+  <nav class="topnav">
+    {{if .user}}
+    <a class="avatar-link" href="/u/{{.user.ID}}" title="个人主页">
+      {{if .user.Avatar}}<img class="avatar" src="{{.user.Avatar}}" alt="{{.user.Username}}">{{else}}<span class="avatar">{{if .user.Username}}{{substr0 .user.Username}}{{end}}</span>{{end}}
+    </a>
+    {{else}}
+    <a class="btn btn-ghost" href="/login">登录</a>
+    <a class="btn btn-primary" href="/register">注册</a>
+    {{end}}
+  </nav>
+</header>
+
+
+
+<main class="container">
+{{pageContent .Page .}}
+</main>
+
+{{if ne .Page "pg_install"}}
+<div class="capsule-wrap">
+  <nav class="capsule-nav" aria-label="主导航">
+    <a class="capsule-item {{if eq .Page "pg_index"}}is-active{{end}}" href="/" aria-label="首页">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5"/><path d="M5.5 9.5V21h13V9.5"/></svg>
+      <span>首页</span>
+    </a>
+    <a class="capsule-item {{if or (eq .Page "pg_food") (eq .Page "pg_food_detail")}}is-active{{end}}" href="/food" aria-label="必吃榜">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3v7M5 3v4a2 2 0 0 0 4 0V3M7 10v11"/><path d="M17 3c-1.8 1.7-2.6 4.1-2.6 6.5S15.2 14 17 14v7"/></svg>
+      <span>必吃榜</span>
+    </a>
+    <a class="capsule-item {{if eq .Page "pg_chat"}}is-active{{end}}" href="/chat" aria-label="聊天室">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.4 8.4 0 0 1-8.9 8.4 9 9 0 0 1-3.3-.6L3 21l1.8-5.2A8.4 8.4 0 0 1 12 3.1a8.4 8.4 0 0 1 9 8.4z"/><path d="M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01"/></svg>
+      <span>聊天室</span>
+    </a>
+    <a class="capsule-item {{if eq .Page "pg_about"}}is-active{{end}}" href="/about" aria-label="关于">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg>
+      <span>关于</span>
+    </a>
+  </nav>
+</div>
+{{end}}
+
+{{$isFood := or (eq .Page "pg_food") (eq .Page "pg_food_detail")}}
+{{if and (or (not $isFood) .canFood) (ne .Page "pg_food_new") (ne .Page "pg_chat")}}
+<a class="fab" href="{{if $isFood}}/food/new{{else}}/compose{{end}}" aria-label="{{if $isFood}}添加店铺{{else}}发帖{{end}}" title="{{if $isFood}}添加店铺{{else}}发帖{{end}}">
+  <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+</a>
+{{end}}
+
+<footer class="site-footer">
+  <p>© dina-jz</p>
+  {{.footer_html}}
+</footer>
+
+{{if .user}}{{template "tip_modal" .}}{{end}}
+
+<script src="/static/app.js?v={{.clvVersion}}" defer></script>
+{{.body_end}}
+</body>
+</html>{{end}}

@@ -1,0 +1,896 @@
+{{/* ============ 后台登录 ============ */}}
+{{define "pg_admin_login"}}
+<div class="admin-login-wrap">
+  <form class="auth card" method="post" action="/admin/login">
+    <h2>管理员登录</h2>
+    <input type="hidden" name="_csrf" value="{{.csrf}}">
+    {{with .err}}<p class="form-err">{{.}}</p>{{end}}
+    <label>用户名<input type="text" name="username" required maxlength="20"></label>
+    <label>密码<input type="password" name="password" required minlength="6"></label>
+    <button class="btn btn-primary btn-block" type="submit">登录后台</button>
+    <p class="auth-alt"><a href="/">返回前台</a></p>
+  </form>
+</div>
+{{end}}
+
+{{/* ============ 仪表盘 ============ */}}
+{{define "pg_dashboard"}}
+<h1 class="page-title">仪表盘</h1>
+<div class="stat-grid">
+  <div class="stat card"><span class="stat-num">{{.users}}</span><span class="stat-label">注册用户</span></div>
+  <div class="stat card"><span class="stat-num">{{.posts}}</span><span class="stat-label">帖子总数</span></div>
+  <div class="stat card"><span class="stat-num">{{.today}}</span><span class="stat-label">今日新增帖子</span></div>
+  <div class="stat card"><span class="stat-num">{{.active7}}</span><span class="stat-label">近7天活跃用户</span></div>
+  <div class="stat card"><span class="stat-num">{{.comments}}</span><span class="stat-label">评论总数</span></div>
+  <div class="stat card"><span class="stat-num {{if gt .reports 0}}warn{{end}}">{{.reports}}</span><span class="stat-label">待处理举报</span></div>
+</div>
+<div class="card">
+  <h3>快捷操作</h3>
+  <div class="btn-row">
+    <a class="btn btn-ghost" href="/admin/posts">帖子管理</a>
+    <a class="btn btn-ghost" href="/admin/reports">处理举报</a>
+    <a class="btn btn-ghost" href="/admin/settings">网站设置</a>
+    <a class="btn btn-ghost" href="/admin/settings#ai">AI 接入</a>
+  </div>
+</div>
+{{.admin_dashboard_after}}
+{{end}}
+
+{{/* ============ 帖子管理 ============ */}}
+{{define "pg_admin_posts"}}
+<h1 class="page-title">帖子管理 <small>共 {{.total}} 条</small></h1>
+<div class="card table-card">
+  <div class="table-scroll">
+    <table class="table">
+      <thead><tr><th>ID</th><th>作者</th><th>内容</th><th>话题</th><th>IP</th><th>指纹</th><th>状态</th><th>互动</th><th>时间</th><th>操作</th></tr></thead>
+      <tbody>
+      {{range .posts}}
+      <tr>
+        <td>{{.ID}}</td>
+        <td>{{.Nickname}}</td>
+        <td class="cell-content"><a href="/post/{{.ID}}" target="_blank">{{snippet .Content 60}}</a></td>
+        <td>{{if .Topic}}# {{.Topic}}{{else}}-{{end}}</td>
+        <td class="mono">{{.IP}}</td>
+        <td class="mono">{{snippet .Fingerprint 10}}</td>
+        <td>{{if eq .Status 1}}<span class="tag ok">可见</span>{{else}}<span class="tag warn">隐藏</span>{{end}}</td>
+        <td>{{.LikeCount}} / {{.CommentCount}}</td>
+        <td class="mono">{{datefmt .CreatedAt}}</td>
+        <td class="ops">
+          <a class="mini-btn" href="/post/{{.ID}}/edit" target="_blank">编辑</a>
+          <form method="post" action="/admin/posts/delete" class="inline-form" data-confirm="确定删除该帖子吗？">
+            <input type="hidden" name="_csrf" value="{{$.csrf}}">
+            <input type="hidden" name="id" value="{{.ID}}">
+            <button class="mini-btn danger" type="submit">删除</button>
+          </form>
+          <form method="post" action="/admin/posts/ban" class="inline-form" data-confirm="确定封禁该用户吗？">
+            <input type="hidden" name="_csrf" value="{{$.csrf}}">
+            <input type="hidden" name="id" value="{{.ID}}">
+            <select name="btype" class="mini-select">
+              <option value="ip">封禁IP</option>
+              <option value="fingerprint">封禁指纹</option>
+              <option value="both">两者都封</option>
+            </select>
+            <button class="mini-btn danger" type="submit">封禁</button>
+          </form>
+        </td>
+      </tr>
+      {{else}}<tr><td colspan="10" class="empty">暂无帖子</td></tr>{{end}}
+      </tbody>
+    </table>
+  </div>
+  <div class="pager">
+    {{if gt .page 1}}<a class="btn btn-ghost" href="/admin/posts?page={{.page | minus1}}">上一页</a>{{end}}
+    <span>第 {{.page}} / {{.pages}} 页</span>
+    {{if lt .page .pages}}<a class="btn btn-ghost" href="/admin/posts?page={{.page | plus1}}">下一页</a>{{end}}
+  </div>
+</div>
+{{end}}
+
+{{/* ============ 网站设置 ============ */}}
+{{define "pg_admin_settings"}}
+<h1 class="page-title">网站设置</h1>
+<form method="post" action="/admin/settings" class="settings-form">
+  <input type="hidden" name="_csrf" value="{{.csrf}}">
+
+  <div class="card">
+    <h3>基本信息</h3>
+    <label>网站名称<input type="text" name="site_name" maxlength="30" value="{{.s.site_name}}"></label>
+    <label>站点访问地址
+      <input type="text" name="site_url" value="{{.s.site_url}}" placeholder="https://jz-wall.top">
+    </label>
+    <p class="muted">用于邮件通知中的帖子链接，不带末尾斜杠。</p>
+  </div>
+
+  <div class="card">
+    <h3>主题管理</h3>
+    <div class="grid2">
+      <label>当前主题
+        <select name="theme">
+          {{$cur := .s.theme}}
+          {{range .themes}}<option value="{{.name}}" {{if eq .name $cur}}selected{{end}}>{{.label}}</option>{{end}}
+        </select>
+      </label>
+      <label>自定义背景图地址（留空使用主题默认）
+        <input type="text" name="theme_bg" value="{{.s.theme_bg}}" placeholder="/uploads/xxx.webp 或完整 URL">
+      </label>
+    </div>
+    <p class="muted">主题开发请参考项目 docs/THEME.md，支持自定义 CSS 变量、背景图与完整样式覆盖。</p>
+  </div>
+
+  <div class="card">
+    <h3>登录与发帖开关</h3>
+    <label class="check-row"><input type="checkbox" name="allow_register" value="1" {{if eq .s.allow_register "1"}}checked{{end}}> 允许新用户注册</label>
+    <label class="check-row"><input type="checkbox" name="require_login_post" value="1" {{if eq .s.require_login_post "1"}}checked{{end}}> 发帖必须登录（已登录用户自动匿名发帖）</label>
+  </div>
+
+  <div class="card">
+    <h3>SMTP 邮箱配置 <small>用于发送注册验证码</small></h3>
+    <div class="grid2">
+      <label>SMTP 主机<input type="text" name="smtp_host" value="{{.s.smtp_host}}" placeholder="smtp.qq.com"></label>
+      <label>端口<input type="text" name="smtp_port" value="{{.s.smtp_port}}" placeholder="465 或 587"></label>
+    </div>
+    <div class="grid2">
+      <label>账号<input type="text" name="smtp_user" value="{{.s.smtp_user}}"></label>
+      <label>密码/授权码<input type="password" name="smtp_pass" value="{{.s.smtp_pass}}"></label>
+    </div>
+    <label>发件人地址<input type="text" name="smtp_from" value="{{.s.smtp_from}}" placeholder="与你邮箱一致"></label>
+    <label class="check-row"><input type="checkbox" name="new_post_mail" value="1" {{if eq .s.new_post_mail "1"}}checked{{end}}> 新帖发布后邮件提醒所有注册用户（含作者本人）</label>
+    <p class="muted">需要完整配置 SMTP。邮件在后台异步群发，自动跳过迁移占位邮箱，密送分批限速发送，不会阻塞发帖，也不会暴露收件人邮箱。</p>
+    <p class="muted">未配置 SMTP 时注册不发送验证码；允许注册即可直接注册。</p>
+  </div>
+
+  <div class="card" id="ai">
+    <h3>AI 模型接入 <small>OpenAI 格式接口，开启后启用全站 AI 功能</small></h3>
+    <label class="check-row"><input type="checkbox" name="ai_enabled" value="1" {{if eq .s.ai_enabled "1"}}checked{{end}}> 启用 AI 功能</label>
+    <div class="grid2">
+      <label>接口地址<input type="text" name="ai_base" value="{{.s.ai_base}}" placeholder="https://api.deepseek.com/v1"></label>
+      <label>模型名<input type="text" name="ai_model" value="{{.s.ai_model}}" placeholder="deepseek-chat"></label>
+    </div>
+    <label>API Key<input type="password" name="ai_key" value="{{.s.ai_key}}"></label>
+    <label class="check-row"><input type="checkbox" name="ai_autopatrol" value="1" {{if eq .s.ai_autopatrol "1"}}checked{{end}}> 开启 AI 智能体自动巡查（每10分钟一次，对未审过的帖子和评论执行保留/隐藏/删除并留痕）</label>
+    <label class="check-row"><input type="checkbox" name="ai_precheck" value="1" {{if eq .s.ai_precheck "1"}}checked{{end}}> 发帖与评论自动审核（违规阻止发布并提示用户修改）</label>
+    <label class="check-row"><input type="checkbox" name="ai_vision" value="1" {{if eq .s.ai_vision "1"}}checked{{end}}> 启用图片审核（需多模态模型，如 gpt-4o / qwen-vl；发帖与巡查时自动识别图片违规内容）</label>
+    <label class="check-row"><input type="checkbox" name="ai_auto_delete" value="1" {{if eq .s.ai_auto_delete "1"}}checked{{end}}> 允许 AI 直接删除严重违规内容（默认关闭：AI 判定删除时降级为隐藏，由人工确认删除，防误判丢数据）</label>
+    <label class="check-row"><input type="checkbox" name="ai_auto_ban" value="1" {{if eq .s.ai_auto_ban "1"}}checked{{end}}> AI 删除时自动封禁发布者（IP 与浏览器指纹，仅配合上一项生效）</label>
+    <label class="check-row"><input type="checkbox" name="ai_precheck_fail" value="closed" {{if eq .s.ai_precheck_fail "closed"}}checked{{end}}> 审核服务异常时阻止发布（默认关闭：异常时放行内容，仅记录日志；开启则提示用户稍后重试）</label>
+  </div>
+
+  <div class="card">
+    <h3>其他</h3>
+    <label>检查更新接口地址<input type="text" name="update_url" value="{{.s.update_url}}"></label>
+    <label>插件商店云端地址<input type="text" name="cloud_api" value="{{.s.cloud_api}}" placeholder="https://clearlove.kazx.top"></label>
+    <p class="muted">插件商店从该地址拉取插件市场数据，默认使用官方云端（https://clearlove.kazx.top）。</p>
+    <label>管理员专享昵称（多个用逗号或换行分隔）
+      <textarea name="admin_nicknames" rows="3" placeholder="例如：官方, 管理员, ClearLove">{{.s.admin_nicknames}}</textarea>
+    </label>
+    <p class="muted">使用这些昵称发帖时必须验证后台管理员账号与密码，通过后帖子会显示「管理员」标识；这些昵称同时禁止被注册。</p>
+    <label>捐赠图片地址<input type="text" name="donate_img" value="{{.s.donate_img}}"></label>
+  </div>
+
+  <button class="btn btn-primary" type="submit">保存设置</button>
+</form>
+
+<div class="card">
+  <h3>主题安装</h3>
+  <form method="post" action="/admin/theme/upload" enctype="multipart/form-data" class="inline-form">
+    <input type="hidden" name="_csrf" value="{{.csrf}}">
+    <input type="file" name="file" accept=".zip" required>
+    <button class="btn btn-ghost" type="submit">上传安装主题</button>
+  </form>
+  <form method="post" action="/admin/theme/delete" class="inline-form" data-confirm="确定删除该主题吗？">
+    <input type="hidden" name="_csrf" value="{{.csrf}}">
+    <input type="text" name="name" placeholder="要删除的主题目录名">
+    <button class="btn btn-ghost danger" type="submit">删除主题</button>
+  </form>
+</div>
+{{.admin_settings_after}}
+{{end}}
+
+{{/* ============ 举报管理 ============ */}}
+{{/* ============ 背景 ============ */}}
+{{define "pg_admin_background"}}
+<h1 class="page-title">背景</h1>
+<form method="post" action="/admin/background/upload" enctype="multipart/form-data" class="settings-form">
+  <input type="hidden" name="_csrf" value="{{.csrf}}">
+  <div class="card">
+    <h3>网站背景 <small>全站显示，帖子卡片自动呈半透明玻璃效果</small></h3>
+    {{if .err}}<p class="form-err">{{.err}}</p>{{end}}
+    {{if .bg}}
+    <div class="admin-bg-preview" style="background-image:url('{{.bg}}')" aria-label="当前背景预览"></div>
+    <p class="muted admin-bg-url">当前背景：{{.bg}}</p>
+    {{else}}
+    <div class="admin-bg-preview is-empty"><span>尚未设置背景</span></div>
+    <p class="muted">上传一张横向图片作为全站背景；设置后帖子卡片会变为半透明玻璃效果。</p>
+    {{end}}
+    <label>选择背景图片
+      <input type="file" name="image" accept="image/jpeg,image/png,image/gif,image/webp" required>
+    </label>
+    <p class="muted">支持 JPG / PNG / GIF / WebP，自动压缩为 WebP，单张不超过 10MB。</p>
+    <button class="btn btn-primary" type="submit">上传并应用</button>
+  </div>
+</form>
+{{if .bg}}
+<form method="post" action="/admin/background/reset" class="inline-form" data-confirm="确定移除当前背景吗？移除后卡片恢复不透明。">
+  <input type="hidden" name="_csrf" value="{{.csrf}}">
+  <button class="btn btn-ghost danger" type="submit">移除当前背景</button>
+</form>
+{{end}}
+{{end}}
+
+{{define "pg_admin_reports"}}
+<h1 class="page-title">举报管理</h1>
+<div class="card">
+  <h3>AI 巡查状态</h3>
+  <p class="muted">
+    AI 功能：{{if .aiOn}}<span class="tag ok">已接入</span>{{else}}<span class="tag warn">未接入</span>{{end}}
+    自动巡查：{{if .patrol}}<span class="tag ok">已开启（每10分钟）</span>{{else}}<span class="tag warn">未开启</span>{{end}}
+    发帖预审：{{if .precheck}}<span class="tag ok">已开启</span>{{else}}<span class="tag warn">未开启</span>{{end}}
+  </p>
+  <div class="btn-row">
+    {{/* 采用 POST 表单：刷新页面不会重复触发巡查（JS 可用时拦截提交并播放动画） */}}
+    <form method="post" action="/admin/reports/patrol" id="patrol-form" class="inline-form">
+      <input type="hidden" name="_csrf" value="{{.csrf}}">
+      <button class="btn btn-primary" type="submit" id="patrol-btn" {{if not .aiReady}}disabled{{end}}>立即执行一轮 AI 巡查</button>
+    </form>
+    <a class="btn btn-ghost" href="/admin/settings#ai">前往 AI 设置</a>
+  </div>
+  {{with .errMsg}}<p class="form-err">{{.}}</p>{{end}}
+  {{if .progress.Running}}<p class="muted">AI 巡查正在后台进行中，完成后刷新本页即可查看结果。</p>{{end}}
+  {{if not .aiReady}}<p class="muted">尚未接入 AI 模型：请先在「网站设置 → AI 模型接入」填写接口地址、模型名与 API Key，巡查与发帖预审方可生效。</p>{{end}}
+</div>
+
+<div class="card table-card">
+  <h3>举报列表</h3>
+  <div class="table-scroll">
+    <table class="table">
+      <thead><tr><th>ID</th><th>帖子</th><th>内容</th><th>举报理由</th><th>状态</th><th>AI/处理结果</th><th>时间</th><th>操作</th></tr></thead>
+      <tbody>
+      {{range .reports}}
+      <tr>
+        <td>{{.ID}}</td>
+        <td>{{if .PostExists}}<a href="/post/{{.PostID}}" target="_blank">#{{.PostID}}</a>{{else}}<span class="muted">已删除</span>{{end}}</td>
+        <td class="cell-content">{{snippet .Content 50}}</td>
+        <td>{{.Reason}}</td>
+        <td>{{if eq .Status 0}}<span class="tag warn">待处理</span>{{else}}<span class="tag ok">已处理</span>{{end}}</td>
+        <td class="cell-content">{{.AIResult}}</td>
+        <td class="mono">{{datefmt .CreatedAt}}</td>
+        <td class="ops">
+          {{if .PostExists}}
+          <form method="post" action="/admin/reports/handle" class="inline-form">
+            <input type="hidden" name="_csrf" value="{{$.csrf}}">
+            <input type="hidden" name="id" value="{{.ID}}">
+            <button class="mini-btn" name="action" value="keep" type="submit">保留</button>
+            <button class="mini-btn" name="action" value="hide" type="submit">隐藏</button>
+            <button class="mini-btn danger" name="action" value="delete" type="submit">删除</button>
+          </form>
+          {{else}}-{{end}}
+        </td>
+      </tr>
+      {{else}}<tr><td colspan="8" class="empty">暂无举报</td></tr>{{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card table-card">
+  <h3>AI 动作留痕（最近100条）</h3>
+  <div class="table-scroll">
+    <table class="table">
+      <thead><tr><th>ID</th><th>目标</th><th>动作</th><th>原因</th><th>时间</th></tr></thead>
+      <tbody>
+      {{range .logs}}
+      <tr>
+        <td>{{.ID}}</td>
+        <td>{{if eq .Target "comment"}}<span class="tag">评论 #{{.PostID}}</span>{{else}}<span class="tag">帖子 #{{.PostID}}</span>{{end}}</td>
+        <td>{{if eq .Action "keep"}}<span class="tag ok">保留</span>{{else if eq .Action "hide"}}<span class="tag warn">隐藏</span>{{else if eq .Action "delete"}}<span class="tag danger">删除</span>{{else}}<code>{{.Action}}</code>{{end}}</td>
+        <td class="cell-content">{{.Reason}}</td>
+        <td class="mono">{{datefmt .CreatedAt}}</td>
+      </tr>
+      {{else}}<tr><td colspan="5" class="empty">暂无记录</td></tr>{{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{{/* AI 巡查进度动画（前端轮询刷新，非阻塞执行） */}}
+<div class="scan-overlay" id="patrol-overlay" hidden data-running="{{if .progress.Running}}1{{else}}0{{end}}">
+  <div class="scan-mask"></div>
+  <div class="scan-card" id="patrol-card">
+    <div class="scan-rings">
+      <svg class="ring" viewBox="0 0 120 120" width="120" height="120" aria-hidden="true">
+        <circle class="ring-bg" cx="60" cy="60" r="52"></circle>
+        <circle class="ring-fg" cx="60" cy="60" r="52" id="patrol-ring"></circle>
+      </svg>
+      <div class="scan-sweep"></div>
+      <div class="ring-center"><span id="patrol-pct">0</span><small>%</small></div>
+    </div>
+    <h3 class="scan-title" id="patrol-title">AI 智能巡查中</h3>
+    <p class="scan-sub" id="patrol-sub">正在读取待检查内容<span class="dots"><i></i><i></i><i></i></span></p>
+    <div class="scan-bar"><span id="patrol-bar"></span></div>
+    <div class="scan-stats">
+      <div class="scan-stat"><b id="patrol-total">0</b><small>待检查</small></div>
+      <div class="scan-stat"><b id="patrol-done">0</b><small>已检查</small></div>
+      <div class="scan-stat ok"><b id="patrol-keep">0</b><small>保留</small></div>
+      <div class="scan-stat warn"><b id="patrol-hide">0</b><small>隐藏</small></div>
+      <div class="scan-stat danger"><b id="patrol-del">0</b><small>删除</small></div>
+    </div>
+    <div class="btn-row center">
+      <button class="btn btn-primary" type="button" id="patrol-finish" hidden>查看巡查结果</button>
+      <button class="btn btn-ghost" type="button" id="patrol-hide-btn">转入后台运行</button>
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{/* ============ 用户管理 ============ */}}
+{{define "pg_admin_users"}}
+<h1 class="page-title">用户管理</h1>
+<div class="card table-card">
+  <div class="table-scroll">
+    <table class="table">
+      <thead><tr><th>ID</th><th>用户名</th><th>邮箱</th><th>帖子数</th><th>状态</th><th>注册时间</th><th>操作</th></tr></thead>
+      <tbody>
+      {{range .users}}
+      <tr>
+        <td>{{.ID}}</td>
+        <td><a href="/u/{{.ID}}" target="_blank">{{.Username}}</a></td>
+        <td>{{.Email}}</td>
+        <td>{{.Posts}}</td>
+        <td>{{if eq .Status 1}}<span class="tag ok">正常</span>{{else}}<span class="tag warn">已禁用</span>{{end}}</td>
+        <td class="mono">{{datefmt .CreatedAt}}</td>
+        <td class="ops">
+          <form method="post" action="/admin/users/status" class="inline-form">
+            <input type="hidden" name="_csrf" value="{{$.csrf}}">
+            <input type="hidden" name="id" value="{{.ID}}">
+            {{if eq .Status 1}}
+            <input type="hidden" name="status" value="0">
+            <button class="mini-btn danger" type="submit">禁用</button>
+            {{else}}
+            <input type="hidden" name="status" value="1">
+            <button class="mini-btn" type="submit">启用</button>
+            {{end}}
+          </form>
+          <form method="post" action="/admin/users/delete" class="inline-form" data-confirm="确定删除该用户及其全部帖子吗？">
+            <input type="hidden" name="_csrf" value="{{$.csrf}}">
+            <input type="hidden" name="id" value="{{.ID}}">
+            <button class="mini-btn danger" type="submit">删除</button>
+          </form>
+        </td>
+      </tr>
+      {{else}}<tr><td colspan="7" class="empty">暂无用户</td></tr>{{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}
+
+{{/* ============ 管理员管理 ============ */}}
+{{define "pg_admin_admins"}}
+<h1 class="page-title">管理员管理</h1>
+<div class="card table-card">
+  <h3>管理员列表</h3>
+  <div class="table-scroll">
+    <table class="table">
+      <thead><tr><th>ID</th><th>用户名</th><th>角色</th><th>权限组</th><th>创建时间</th><th>操作</th></tr></thead>
+      <tbody>
+      {{range .admins}}
+      <tr>
+        <td>{{.ID}}</td>
+        <td>{{.Username}}</td>
+        <td>{{if eq .Role "super"}}<span class="tag ok">超级管理员</span>{{else}}<span class="tag">自定义</span>{{end}}</td>
+        <td class="mono">{{snippet .Perms 80}}</td>
+        <td class="mono">{{datefmt .CreatedAt}}</td>
+        <td class="ops">
+          {{if ne .ID $.me}}
+          <form method="post" action="/admin/admins/delete" class="inline-form" data-confirm="确定删除该管理员吗？">
+            <input type="hidden" name="_csrf" value="{{$.csrf}}">
+            <input type="hidden" name="id" value="{{.ID}}">
+            <button class="mini-btn danger" type="submit">删除</button>
+          </form>
+          {{else}}<span class="muted">当前账号</span>{{end}}
+        </td>
+      </tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <h3>添加管理员</h3>
+  <form method="post" action="/admin/admins/create">
+    <input type="hidden" name="_csrf" value="{{.csrf}}">
+    <div class="grid2">
+      <label>用户名<input type="text" name="username" required minlength="3" maxlength="20"></label>
+      <label>密码<input type="password" name="password" required minlength="6"></label>
+    </div>
+    <label>角色
+      <select name="role">
+        <option value="custom">自定义权限</option>
+        <option value="super">超级管理员（全部权限）</option>
+      </select>
+    </label>
+    <fieldset class="perm-fieldset">
+      <legend>权限组（自定义角色勾选生效）</legend>
+      <label class="check-row"><input type="checkbox" name="perm_posts" value="1"> 帖子管理</label>
+      <label class="check-row"><input type="checkbox" name="perm_reports" value="1"> 举报管理</label>
+      <label class="check-row"><input type="checkbox" name="perm_users" value="1"> 用户管理</label>
+      <label class="check-row"><input type="checkbox" name="perm_settings" value="1"> 网站设置</label>
+      <label class="check-row"><input type="checkbox" name="perm_notices" value="1"> 公告与话题</label>
+      <label class="check-row"><input type="checkbox" name="perm_plugins" value="1"> 插件管理</label>
+      <label class="check-row"><input type="checkbox" name="perm_api" value="1"> API 接口</label>
+      <label class="check-row"><input type="checkbox" name="perm_admins" value="1"> 管理员管理</label>
+    </fieldset>
+    <button class="btn btn-primary" type="submit">添加管理员</button>
+  </form>
+</div>
+{{end}}
+
+{{/* ============ 公告与话题 ============ */}}
+{{define "pg_admin_notices"}}
+<h1 class="page-title">公告与话题</h1>
+<div class="grid2-cards">
+  <div class="card">
+    <h3>发布公告</h3>
+    <form method="post" action="/admin/notices">
+      <input type="hidden" name="_csrf" value="{{.csrf}}">
+      <input type="hidden" name="op" value="notice_create">
+      <label>标题<input type="text" name="title" maxlength="50" required></label>
+      <label>内容<textarea name="content" maxlength="1000" rows="4" required></textarea></label>
+      <button class="btn btn-primary" type="submit">发布公告</button>
+    </form>
+    <p class="muted">公告发布后将在前台展示，同一访客每天展示一次。</p>
+  </div>
+  <div class="card">
+    <h3>公告列表</h3>
+    <ul class="simple-list">
+      {{range .notices}}
+      <li>
+        <div><b>{{.title}}</b><small>{{snippet .content 40}}</small></div>
+        <form method="post" action="/admin/notices" class="inline-form" data-confirm="确定删除该公告吗？">
+          <input type="hidden" name="_csrf" value="{{$.csrf}}">
+          <input type="hidden" name="op" value="notice_delete">
+          <input type="hidden" name="id" value="{{.id}}">
+          <button class="mini-btn danger" type="submit">删除</button>
+        </form>
+      </li>
+      {{else}}<li class="empty">暂无公告</li>{{end}}
+    </ul>
+  </div>
+</div>
+
+<div class="grid2-cards">
+  <div class="card">
+    <h3>话题管理</h3>
+    <div class="topic-chips topic-manage">
+      {{range .topics}}
+      <span class="chip"># {{.name}}
+        <form method="post" action="/admin/notices" class="inline-form" data-confirm="确定删除该话题吗？">
+          <input type="hidden" name="_csrf" value="{{$.csrf}}">
+          <input type="hidden" name="op" value="topic_delete">
+          <input type="hidden" name="id" value="{{.id}}">
+          <button class="chip-x" type="submit" aria-label="删除"><svg viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" stroke-width="3" fill="none"><path d="M5 5l14 14M19 5L5 19"/></svg></button>
+        </form>
+      </span>
+      {{else}}<span class="empty">暂无话题</span>{{end}}
+    </div>
+    <form method="post" action="/admin/notices" class="inline-form">
+      <input type="hidden" name="_csrf" value="{{.csrf}}">
+      <input type="hidden" name="op" value="topic_create">
+      <input type="text" name="name" maxlength="30" placeholder="新话题名称" required>
+      <button class="btn btn-ghost" type="submit">新建话题</button>
+    </form>
+  </div>
+  <div class="card">
+    <h3>社区守则</h3>
+    <form method="post" action="/admin/notices">
+      <input type="hidden" name="_csrf" value="{{.csrf}}">
+      <input type="hidden" name="op" value="rules_save">
+      <textarea name="rules" rows="8" maxlength="3000">{{.rules}}</textarea>
+      <button class="btn btn-primary" type="submit">保存守则</button>
+    </form>
+    <p class="muted">守则会展示在帖子详情页，同时作为 AI 审核与巡查的判定依据。</p>
+  </div>
+</div>
+{{end}}
+
+{{/* ============ 插件管理 ============ */}}
+{{define "pg_admin_plugins"}}
+<h1 class="page-title">插件管理</h1>
+<div class="card">
+  <h3>安装插件</h3>
+  <form method="post" action="/admin/plugins/upload" enctype="multipart/form-data" class="inline-form">
+    <input type="hidden" name="_csrf" value="{{.csrf}}">
+    <input type="file" name="file" accept=".zip" required>
+    <button class="btn btn-primary" type="submit">上传并安装</button>
+  </form>
+  <p class="muted">插件为 zip 包，需包含 plugin.json。两种形态：声明式（html 注入 / filter 内容过滤 / http 事件 Webhook / guard 发帖守卫 / badge 帖子标识）与应用型（kind=app，脚本注册路由 / 数据表 / 后台菜单 / 定时任务）。开发文档见项目 docs/PLUGIN.md。</p>
+</div>
+
+{{if .adminTop}}
+<div class="card">{{.adminTop}}</div>
+{{end}}
+
+{{range .plugins}}
+{{if .Config}}
+<details class="card plugin-config{{if not .Enabled}} plugin-config-disabled{{end}}">
+  <summary class="plugin-config-head">
+    <span class="plugin-config-arrow" aria-hidden="true">▶</span>
+    <span class="plugin-config-title">{{.Name}}</span>
+    <small class="muted">v{{.Version}} 插件设置</small>
+    {{if .Enabled}}<span class="tag ok">已启用</span>{{else}}<span class="tag warn">插件未启用</span>{{end}}
+  </summary>
+  {{if .Enabled}}
+  <div class="plugin-config-body">
+  <form method="post" action="/admin/plugins/config" enctype="multipart/form-data">
+  <input type="hidden" name="_csrf" value="{{$.csrf}}">
+  <input type="hidden" name="plugin" value="{{.Name}}">
+  {{$cfg := index $.configs .Name}}
+  {{range .Config}}
+  {{if eq .Type "audio"}}
+  {{/* 上传型字段：不套 label，避免点击试听控件时触发文件选择 */}}
+  {{$audio := index $cfg .Key}}
+  <div class="plugin-audio">
+    <span class="field-label">{{.Label}}</span>
+    {{if $audio}}
+    <audio src="{{$audio}}" controls preload="none" class="plugin-audio-prev"></audio>
+    <label class="check-row"><input type="checkbox" name="cfg_{{.Key}}__clear" value="1"> 删除当前音乐</label>
+    {{else}}<span class="muted small">尚未上传</span>{{end}}
+    <input type="file" name="cfg_{{.Key}}__file" accept="audio/*,.mp3,.m4a,.aac,.ogg,.oga,.opus,.wav,.flac">
+    <input type="hidden" name="cfg_{{.Key}}" value="{{$audio}}">
+  </div>
+  {{else}}
+  <label>{{.Label}}
+    {{if eq .Type "textarea"}}
+    <textarea name="cfg_{{.Key}}" rows="3" placeholder="{{.Default}}">{{index $cfg .Key}}</textarea>
+    {{else if eq .Type "switch"}}
+    <span class="check-row"><input type="checkbox" name="cfg_{{.Key}}" value="1" {{if eq (index $cfg .Key) "1"}}checked{{end}}> 开启</span>
+    {{else if eq .Type "select"}}
+    {{$cur := index $cfg .Key}}
+    <select name="cfg_{{.Key}}">{{range .Options}}<option value="{{.}}" {{if eq . $cur}}selected{{end}}>{{.}}</option>{{end}}</select>
+    {{else}}
+    <input type="text" name="cfg_{{.Key}}" value="{{index $cfg .Key}}" placeholder="{{.Default}}">
+    {{end}}
+  </label>
+  {{end}}
+  {{if .Help}}<p class="muted small plugin-help">{{.Help}}</p>{{end}}
+  {{end}}
+  <div class="btn-row"><button class="btn btn-primary" type="submit">保存设置</button></div>
+</form>
+  </div>
+  {{else}}
+  <p class="muted plugin-config-tip">插件未启用，请先在下方「已安装插件」列表中启用该插件，再进行配置。</p>
+  {{end}}
+</details>
+{{end}}
+{{end}}
+
+<div class="card table-card">
+  <h3>已安装插件</h3>
+  <div class="table-scroll">
+    <table class="table">
+      <thead><tr><th>名称</th><th>类型</th><th>版本</th><th>作者</th><th>说明</th><th>钩子数</th><th>状态</th><th>操作</th></tr></thead>
+      <tbody>
+      {{range $p := .plugins}}
+      {{$info := index $.infos $p.Name}}
+      <tr>
+        <td><b>{{$p.Name}}</b>{{if $p.Warn}}<br><small class="warn">⚠ {{$p.Warn}}</small>{{end}}{{if $p.App}}<br><small class="muted">/x/{{$p.Slug}}/</small>{{end}}</td>
+        <td>{{if $p.App}}<span class="tag">应用型</span>{{else}}<span class="tag">声明式</span>{{end}}</td>
+        <td>{{$p.Version}}</td>
+        <td>{{$p.Author}}</td>
+        <td class="cell-content">{{$p.Description}}
+          {{if $p.App}}
+          <br><small class="muted">路由 {{$info.Routes}} · 页面 {{$info.Pages}} · Slot {{$info.Slots}} · 事件 {{$info.Events}} · 过滤器 {{$info.Filters}}</small>
+          {{if $info.Perms}}<br><small class="muted">权限：{{range $info.Perms}}<code>{{.}}</code> {{end}}</small>{{end}}
+          {{if $info.Jobs}}<br><small class="muted">定时任务：{{range $info.Jobs}}{{.Name}}（{{.Every}}） {{end}}</small>{{end}}
+          {{if $info.Fails}}<br><small class="warn">连续失败 {{$info.Fails}} 次（达 20 次将自动禁用）</small>{{end}}
+          {{end}}
+        </td>
+        <td>{{len $p.Hooks}}</td>
+        <td>{{if $p.Enabled}}{{if $p.App}}{{if $info.Running}}<span class="tag ok">运行中</span>{{else}}<span class="tag warn">未运行</span>{{end}}{{else}}<span class="tag ok">已启用</span>{{end}}{{else}}<span class="tag warn">已禁用</span>{{end}}</td>
+        <td class="ops">
+          <form method="post" action="/admin/plugins/toggle" class="inline-form"{{if and $p.App (not $p.Enabled)}}{{if $info.Perms}} data-confirm="该插件声明了权限：{{range $info.Perms}}{{.}} {{end}}；确定启用吗？"{{end}}{{end}}>
+            <input type="hidden" name="_csrf" value="{{$.csrf}}">
+            <input type="hidden" name="name" value="{{$p.Name}}">
+            {{if $p.Enabled}}
+            <input type="hidden" name="on" value="0">
+            <button class="mini-btn" type="submit">禁用</button>
+            {{else}}
+            <input type="hidden" name="on" value="1">
+            <button class="mini-btn" type="submit">启用</button>
+            {{end}}
+          </form>
+          {{if and $p.App $p.Enabled}}
+          <form method="post" action="/admin/plugins/reload" class="inline-form">
+            <input type="hidden" name="_csrf" value="{{$.csrf}}">
+            <input type="hidden" name="name" value="{{$p.Name}}">
+            <button class="mini-btn" type="submit">重载</button>
+          </form>
+          {{end}}
+          <a class="mini-btn" href="/admin/plugin-logs?slug={{$p.Slug}}">日志</a>
+          <form method="post" action="/admin/plugins/delete" class="inline-form" data-confirm="确定卸载该插件吗？">
+            <input type="hidden" name="_csrf" value="{{$.csrf}}">
+            <input type="hidden" name="name" value="{{$p.Name}}">
+            <button class="mini-btn danger" type="submit">卸载</button>
+          </form>
+        </td>
+      </tr>
+      {{else}}<tr><td colspan="8" class="empty">暂无插件</td></tr>{{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}
+
+{{/* ============ 插件商店（对接云端插件社区） ============ */}}
+{{define "pg_admin_store"}}
+<div class="page-head row">
+  <div>
+    <h1 class="page-title">插件商店</h1>
+    <p class="muted">来自 ClearLove 云端插件社区 · <span class="mono">{{.cloud}}</span></p>
+  </div>
+  <form method="get" action="/admin/store" class="code-row">
+    <input type="text" name="q" value="{{.q}}" placeholder="搜索插件名称 / 描述">
+    <select name="kind">
+      <option value="">全部形态</option>
+      <option value="declarative" {{if eq .kind "declarative"}}selected{{end}}>声明式</option>
+      <option value="app" {{if eq .kind "app"}}selected{{end}}>应用型</option>
+    </select>
+    <button class="btn btn-ghost" type="submit">搜索</button>
+  </form>
+</div>
+
+{{if .notice}}<p class="form-ok">{{.notice}}</p>{{end}}
+{{if .errMsg}}<p class="form-err">{{.errMsg}}</p>{{end}}
+
+{{if .plugins}}
+<div class="store-grid">
+  {{range .plugins}}
+  <article class="card store-card">
+    <div class="store-head">
+      <span class="avatar">{{substr0 .Name}}</span>
+      <div class="meta">
+        <span class="nickname">{{.Name}}</span>
+        <span class="muted mono">v{{.Version}} · {{.CategoryTxt}}</span>
+      </div>
+    </div>
+    <p class="store-desc">{{if .Description}}{{snippet .Description 96}}{{else}}暂无描述{{end}}</p>
+    <div class="store-meta">
+      <span>作者：{{.Author}}</span>
+      <span>↓ {{.Downloads}}</span>
+      <span>安装 {{.Installs}}</span>
+    </div>
+    {{if eq .Kind "app"}}
+    <p class="muted"><span class="tag">应用型</span>{{if .Permissions}} 权限：{{range .Permissions}}<code>{{.}}</code> {{end}}{{end}}</p>
+    {{end}}
+    <div class="store-actions">
+      {{if index $.installed .Name}}
+      <span class="tag ok">已安装</span>
+      <a class="mini-btn" href="/admin/plugins">去启用</a>
+      {{else}}
+      {{if .Version}}
+      <form method="post" action="/admin/store/install" class="inline-form" data-confirm="确定从云端安装插件「{{.Name}}」吗？{{if .Permissions}}该插件声明权限：{{range .Permissions}}{{.}} {{end}}{{end}}">
+        <input type="hidden" name="_csrf" value="{{$.csrf}}">
+        <input type="hidden" name="slug" value="{{.Slug}}">
+        <input type="hidden" name="version" value="{{.Version}}">
+        <input type="hidden" name="sha256" value="{{.SHA256}}">
+        <button class="mini-btn" type="submit">安装</button>
+      </form>
+      {{end}}
+      <a class="mini-btn" href="{{.PageURL}}" target="_blank" rel="noopener">详情</a>
+      {{end}}
+    </div>
+  </article>
+  {{end}}
+</div>
+{{else if not .errMsg}}
+<p class="empty">云端暂时没有可安装的插件</p>
+{{end}}
+{{end}}
+
+{{/* ============ API 接口 ============ */}}
+{{define "pg_admin_apikeys"}}
+<h1 class="page-title">API 接口</h1>
+<div class="card">
+  <h3>生成 API Key</h3>
+  <form method="post" action="/admin/apikeys/create" class="inline-form">
+    <input type="hidden" name="_csrf" value="{{.csrf}}">
+    <input type="text" name="name" maxlength="30" placeholder="用途备注（例如：iOS 客户端）">
+    <button class="btn btn-primary" type="submit">生成密钥</button>
+  </form>
+  <p class="muted">第三方客户端在请求头携带 X-API-Key 即可调用 /api/v1 全部接口，无需登录。</p>
+</div>
+<div class="card table-card">
+  <h3>密钥列表</h3>
+  <div class="table-scroll">
+    <table class="table">
+      <thead><tr><th>ID</th><th>备注</th><th>密钥</th><th>最近使用</th><th>创建时间</th><th>操作</th></tr></thead>
+      <tbody>
+      {{range .keys}}
+      <tr>
+        <td>{{.ID}}</td><td>{{.Name}}</td>
+        <td class="mono">{{.Key}}</td>
+        <td class="mono">{{if .LastUsed}}{{datefmt .LastUsed}}{{else}}从未{{end}}</td>
+        <td class="mono">{{datefmt .CreatedAt}}</td>
+        <td class="ops">
+          <form method="post" action="/admin/apikeys/delete" class="inline-form" data-confirm="确定删除该密钥吗？">
+            <input type="hidden" name="_csrf" value="{{$.csrf}}">
+            <input type="hidden" name="id" value="{{.ID}}">
+            <button class="mini-btn danger" type="submit">删除</button>
+          </form>
+        </td>
+      </tr>
+      {{else}}<tr><td colspan="6" class="empty">暂无密钥</td></tr>{{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+<div class="card">
+  <h3>接口速览</h3>
+  <ul class="api-list">
+    <li><span class="method get">GET</span> /api/v1/posts?before=&amp;limit=&amp;topic= 帖子列表</li>
+    <li><span class="method get">GET</span> /api/v1/posts/{id} 帖子详情</li>
+    <li><span class="method post">POST</span> /api/v1/posts 发布帖子（JSON：content/nickname/topic/images/videos）</li>
+    <li><span class="method post">POST</span> /api/v1/upload 上传媒体（multipart：file）→ 返回 url</li>
+    <li><span class="method post">POST</span> /api/v1/posts/{id}/like 点赞/取消</li>
+    <li><span class="method post">POST</span> /api/v1/comments 发表评论（post_id/content/nickname）</li>
+    <li><span class="method post">POST</span> /api/v1/reports 举报（post_id/reason）</li>
+    <li><span class="method get">GET</span> /api/v1/topics 话题列表</li>
+  </ul>
+</div>
+{{end}}
+
+{{/* ============ 关于 ============ */}}
+{{/* ============ 数据迁移（旧版 PHP 1.x → 2.0） ============ */}}
+{{define "pg_admin_migrate"}}
+<div class="page-head">
+  <h1 class="page-title">数据迁移</h1>
+  <p class="muted">把 ClearLove PHP 旧版（1.x）的帖子、评论、用户等数据迁移到当前站点</p>
+</div>
+
+<div class="card">
+  <h3>迁移说明</h3>
+  <ul class="tips-list">
+    <li>支持旧版 <b>SQLite</b> 数据库文件（旧版根目录的 <code>data.db</code>）与 <b>MySQL</b> 导出的 <code>.sql</code> 文件（宝塔「数据库 → 备份」或 <code>mysqldump</code>），上传后自动识别</li>
+    <li>迁移会<b>保留原有 ID 与发布时间</b>，旧版的「正常 / 隐藏」状态会自动换算为新版语义（不会出现帖子集体消失或隐藏帖冒出来）</li>
+    <li>用户与管理员密码同为 bcrypt，<b>迁移后可直接用原密码登录</b></li>
+    <li>可重复执行：已存在的记录会自动跳过，不会产生重复数据</li>
+    <li>迁移期间请勿发帖；数据量大时耗时较长，可以关闭页面稍后回来查看结果</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h3>上传旧版数据库</h3>
+  <form id="migrate-form" enctype="multipart/form-data">
+    <input type="hidden" name="_csrf" value="{{.csrf}}">
+    <label>数据库文件
+      <input type="file" name="file" id="migrate-file" accept=".db,.sql,.sqlite,.sqlite3" required>
+    </label>
+    <p class="muted small">单个文件不超过 {{.maxMB}}MB。SQLite 请上传旧版根目录的 <code>data.db</code>；MySQL 请上传导出的 <code>.sql</code>。</p>
+
+    <label>旧版 uploads 目录路径（可选）
+      <input type="text" name="uploads_dir" id="migrate-uploads" placeholder="/www/wwwroot/old/uploads">
+    </label>
+    <p class="muted small">填写服务器上的绝对路径时，会把旧站图片 / 视频复制到新版 <code>uploads/legacy/</code>；留空则只迁移文字数据（图片会缺失，但不影响帖子本身）。</p>
+
+    <label class="check-row"><input type="checkbox" name="dry" value="1" id="migrate-dry" checked> 试运行（只统计不写入，建议先跑一次）</label>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" type="submit" id="migrate-start">开始迁移</button>
+    </div>
+  </form>
+  <div class="progress" id="migrate-progress" hidden><span></span></div>
+  <p class="form-ok" id="migrate-ok" hidden></p>
+  <p class="form-err" id="migrate-err" hidden></p>
+</div>
+
+<div class="card" id="migrate-result" hidden>
+  <h3>迁移结果</h3>
+  <div id="migrate-result-body"></div>
+</div>
+{{end}}
+
+{{define "pg_admin_about"}}
+<h1 class="page-title">关于</h1>
+<div class="card about-card">
+  <svg viewBox="0 0 24 24" width="52" height="52" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21s-8-5.2-8-10.4C4 7 6.2 5 8.8 5c1.6 0 2.7.8 3.2 1.7C12.5 5.8 13.6 5 15.2 5 17.8 5 20 7 20 10.6 20 15.8 12 21 12 21z"/></svg>
+  <h2>ClearLove 表白墙</h2>
+  <p class="muted">仰望星辰工作室，夏日之瓜，出品</p>
+</div>
+{{end}}
+
+{{/* ============ 检查更新 ============ */}}
+{{define "pg_admin_update"}}
+<h1 class="page-title">检查更新</h1>
+<div class="card">
+  <table class="kv-table">
+    <tr><th>当前版本</th><td>{{.result.current}}</td></tr>
+    <tr><th>运行平台</th><td>{{.platform}} {{if .canSelfUpdate}}<span class="tag ok">支持一键更新</span>{{else}}<span class="tag warn">一键更新仅支持 Linux x86_64</span>{{end}}</td></tr>
+    <tr><th>更新接口</th><td class="mono">{{.result.url}}</td></tr>
+    {{with .result.latest}}<tr><th>最新版本</th><td>{{.}}</td></tr>{{end}}
+    {{with .result.notes}}<tr><th>更新说明</th><td>{{.}}</td></tr>{{end}}
+    {{with .result.download}}<tr><th>下载地址</th><td class="mono">{{.}}</td></tr>{{end}}
+    {{with .result.sha256}}<tr><th>SHA256</th><td class="mono">{{.}}</td></tr>{{end}}
+    {{with .result.error}}<tr><th>结果</th><td class="warn">{{.}}</td></tr>{{end}}
+  </table>
+  {{if .result.upToDate}}<p class="tag ok">当前已是最新版本</p>
+  {{else if .result.latest}}
+  <p class="tag warn">发现新版本</p>
+  {{if .canSelfUpdate}}
+  <div class="btn-row" style="margin-top:10px">
+    <button class="btn btn-primary" id="self-update-btn" type="button">立即更新</button>
+    <span id="self-update-msg" class="muted"></span>
+  </div>
+  {{else}}
+  <p class="muted small">请前往上方下载地址手动替换二进制文件后重启服务。</p>
+  {{end}}
+  {{end}}
+  <div class="btn-row">
+    <a class="btn btn-ghost" href="/admin/update">重新检查</a>
+  </div>
+  <p class="muted small">云端接口（网站设置 → 更新接口地址）返回 JSON，例如：
+    <code>{"version":"2.0.1","notes":"更新说明","packages":{"linux-amd64":{"url":"二进制直链","sha256":"文件SHA256"}}}</code>；
+    一键更新必须提供 linux-amd64 的 sha256，更新时旧程序会备份为「程序名.bak」。</p>
+</div>
+<script>
+(function () {
+  var btn = document.getElementById("self-update-btn");
+  if (!btn) return;
+  var msg = document.getElementById("self-update-msg");
+  var csrf = "";
+  var m = document.querySelector('meta[name="csrf"]');
+  if (m) csrf = m.content || "";
+  btn.addEventListener("click", function () {
+    if (!confirm("确定立即更新到最新版本吗？\\n更新过程中服务会短暂重启（原地换载，一般 1-2 秒）。")) return;
+    btn.disabled = true;
+    msg.textContent = "正在下载并校验新版本，请勿关闭页面…";
+    fetch("/admin/update/apply", { method: "POST", headers: { "X-CSRF-Token": csrf } })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (res.ok) {
+          msg.textContent = (res.msg || "更新完成") + "，3 秒后自动刷新…";
+          setTimeout(function () { location.reload(); }, 3000);
+        } else {
+          msg.textContent = res.msg || "更新失败";
+          btn.disabled = false;
+        }
+      })
+      .catch(function () {
+        msg.textContent = "连接中断：若由重启所致，说明更新可能已成功，请刷新页面查看版本";
+        btn.disabled = false;
+      });
+  });
+})();
+</script>
+{{end}}
+
+{{/* ============ 插件运行日志 ============ */}}
+{{define "pg_admin_plugin_logs"}}
+<h1 class="page-title">插件运行日志{{if .slug}} <small>已筛选：{{.slug}}</small>{{end}}</h1>
+<div class="card table-card">
+  <div class="btn-row" style="margin-bottom:12px">
+    <a class="btn btn-ghost" href="/admin/plugins">返回插件管理</a>
+    {{if .slug}}<a class="btn btn-ghost" href="/admin/plugin-logs">查看全部</a>{{end}}
+    <form method="post" action="/admin/plugin-logs/clear" class="inline-form" data-confirm="确定清空全部插件运行日志吗？">
+      <input type="hidden" name="_csrf" value="{{.csrf}}">
+      <button class="mini-btn danger" type="submit">清空日志</button>
+    </form>
+  </div>
+  <div class="table-scroll">
+    <table class="table">
+      <thead><tr><th>时间</th><th>插件</th><th>动作</th><th>详情</th><th>耗时</th></tr></thead>
+      <tbody>
+      {{range .logs}}
+      <tr>
+        <td>{{datefmt .created_at}}</td>
+        <td><a href="/admin/plugin-logs?slug={{.plugin_slug}}">{{.plugin_slug}}</a></td>
+        <td><code>{{.action}}</code></td>
+        <td class="cell-content">{{.detail}}</td>
+        <td>{{.duration_ms}} ms</td>
+      </tr>
+      {{else}}<tr><td colspan="5" class="empty">暂无日志</td></tr>{{end}}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{end}}

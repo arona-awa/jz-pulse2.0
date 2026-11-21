@@ -1,0 +1,66 @@
+{{define "pg_install"}}
+<div class="install-wrap">
+  <div class="install-head">
+    <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-8-5.2-8-10.4C4 7 6.2 5 8.8 5c1.6 0 2.7.8 3.2 1.7C12.5 5.8 13.6 5 15.2 5 17.8 5 20 7 20 10.6 20 15.8 12 21 12 21z"/></svg>
+    <h1>ClearLove 表白墙 2.0</h1>
+    <p class="muted">安装向导 · 共 3 步 · 版本 {{.version}}</p>
+  </div>
+
+  <div class="steps">
+    <div class="step-dot active" data-step="1">1</div>
+    <div class="step-line"></div>
+    <div class="step-dot" data-step="2">2</div>
+    <div class="step-line"></div>
+    <div class="step-dot" data-step="3">3</div>
+  </div>
+
+  <form class="install-card card" id="install-form">
+    <input type="hidden" name="_csrf" value="{{.csrf}}">
+
+    <section class="install-step" data-step="1">
+      <h2>第一步：选择数据库</h2>
+      <label class="radio-row">
+        <input type="radio" name="db_type" value="sqlite" checked>
+        <span><b>SQLite（默认）</b><small>零配置，数据保存在 data/clearlove.db</small></span>
+      </label>
+      <label class="radio-row">
+        <input type="radio" name="db_type" value="mysql">
+        <span><b>MySQL</b><small>需要填写连接信息，请先创建好数据库</small></span>
+      </label>
+      <div class="mysql-fields" id="mysql-fields" hidden>
+        <div class="grid2">
+          <label>主机<input type="text" name="mysql_host" value="127.0.0.1"></label>
+          <label>端口<input type="text" name="mysql_port" value="3306"></label>
+        </div>
+        <label>数据库名<input type="text" name="mysql_name" placeholder="clearlove"></label>
+        <div class="grid2">
+          <label>用户名<input type="text" name="mysql_user" placeholder="root"></label>
+          <label>密码<input type="password" name="mysql_pass"></label>
+        </div>
+      </div>
+    </section>
+
+    <section class="install-step" data-step="2">
+      <h2>第二步：网站信息</h2>
+      <label>网站名称<input type="text" name="site_name" maxlength="30" required placeholder="例如：ClearLove 表白墙"></label>
+      <p class="muted">该名称将显示在前台导航栏与页面标题中，安装后可在后台修改。</p>
+    </section>
+
+    <section class="install-step" data-step="3">
+      <h2>第三步：管理员账号</h2>
+      <label>管理员用户名<input type="text" name="admin_user" required minlength="3" maxlength="20" placeholder="至少 3 位"></label>
+      <label>管理员密码<input type="password" name="admin_pass" required minlength="6" placeholder="至少 6 位"></label>
+      <p class="muted">安装完成后，可通过 /admin 进入后台管理。</p>
+    </section>
+
+    <p class="form-err" id="install-err" hidden></p>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" type="button" id="install-prev" hidden>上一步</button>
+      <button class="btn btn-primary" type="button" id="install-next" hidden>下一步</button>
+      <button class="btn btn-primary" type="submit" id="install-submit">完成安装</button>
+    </div>
+    <p class="muted">提示：未启用 JavaScript 时可直接填写上方全部内容并点击「完成安装」。</p>
+  </form>
+</div>
+{{end}}

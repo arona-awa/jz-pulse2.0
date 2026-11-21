@@ -1,0 +1,44 @@
+{
+  "name": "官方身份守卫",
+  "version": "1.0.0",
+  "author": "ClearLove",
+  "description": "使用指定昵称发帖时必须验证后台管理员账号，帖子显示自定义标识，防止冒充官方身份",
+  "requires": "2.0.0",
+  "config": [
+    {
+      "key": "nicknames",
+      "label": "专享昵称",
+      "type": "textarea",
+      "default": "官方,公告",
+      "help": "使用这些昵称发帖时需验证后台账号，多个用逗号或换行分隔"
+    },
+    {
+      "key": "badge",
+      "label": "帖子标识",
+      "type": "text",
+      "default": "官方",
+      "help": "验证通过的帖子在昵称后显示的徽章文字"
+    },
+    {
+      "key": "message",
+      "label": "失败提示",
+      "type": "text",
+      "default": "该昵称为官方专享，请验证管理员账号后发布"
+    }
+  ],
+  "hooks": [
+    {
+      "hook": "compose_guard",
+      "type": "guard",
+      "nicknames": "{config:nicknames}",
+      "require": "admin",
+      "label": "{config:badge}",
+      "message": "{config:message}"
+    },
+    {
+      "hook": "footer_html",
+      "type": "html",
+      "html": "<style>.post-badge{box-shadow:0 1px 6px rgba(255,123,169,.45)}</style>"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+<h1 class="page-title">签到管理</h1>
+
+<div class="stat-grid">
+  <div class="stat card"><span class="stat-num">{{.total.n}}</span><span class="stat-label">累计签到次数</span></div>
+  <div class="stat card"><span class="stat-num">{{.total.p}}</span><span class="stat-label">累计发放积分</span></div>
+</div>
+
+<div class="card table-card">
+  <h3>最近 30 天</h3>
+  <div class="table-scroll">
+    <table class="table">
+      <thead><tr><th>日期</th><th>签到人数</th></tr></thead>
+      <tbody>
+      {{range .days}}
+        <tr><td>{{.day}}</td><td>{{.n}}</td></tr>
+      {{else}}
+        <tr><td colspan="2" class="empty">暂无数据</td></tr>
+      {{end}}
+      </tbody>
+    </table>
+  </div>
+</div>

@@ -1,0 +1,62 @@
+{
+  "kind": "app",
+  "name": "AI 语句美化",
+  "slug": "ai-polish",
+  "version": "1.0.0",
+  "author": "ClearLove",
+  "description": "在发帖页提供「AI 美化」按钮：调用站点已接入的 AI 模型润色帖子内容，支持提示词、限流、登录门槛等配置",
+  "requires": "2.1.0",
+  "runtime": {
+    "engine": "js",
+    "entry": "main.js",
+    "timeout_ms": 28000
+  },
+  "permissions": ["settings.read", "net", "net.local", "cache"],
+  "config": [
+    {
+      "key": "prompt",
+      "label": "美化提示词",
+      "type": "textarea",
+      "default": "请在不改变原意、不增删事实的前提下，把下面这段文字润色得更通顺、真诚、有文采。只输出润色后的正文，不要任何解释、前缀或引号。",
+      "help": "系统提示词，决定美化的风格与尺度"
+    },
+    {
+      "key": "button_text",
+      "label": "按钮文案",
+      "type": "text",
+      "default": "AI 美化",
+      "help": "发帖页按钮上显示的文字"
+    },
+    {
+      "key": "max_chars",
+      "label": "单次处理上限（字）",
+      "type": "number",
+      "default": "600",
+      "help": "超过该长度的内容会被拒绝，避免一次消耗过多额度"
+    },
+    {
+      "key": "rate_limit",
+      "label": "每 IP 每分钟次数",
+      "type": "number",
+      "default": "3",
+      "help": "按访客 IP 限流，防止接口被刷"
+    },
+    {
+      "key": "temperature",
+      "label": "创造度（0-1）",
+      "type": "number",
+      "default": "0.7",
+      "help": "越高越有文采，越低越贴近原文"
+    },
+    {
+      "key": "require_login",
+      "label": "仅登录用户可用",
+      "type": "switch",
+      "default": "0",
+      "help": "开启后未登录访客不会看到美化按钮"
+    }
+  ],
+  "hooks": [
+    { "hook": "footer_html", "type": "html", "html": "@polish.html" }
+  ]
+}
