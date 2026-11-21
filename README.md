@@ -139,6 +139,9 @@ config.json
 - App 打开时每 30 秒、后台每 15 分钟轮询 `/api/v1/events`，通过系统通知提示新帖、点赞、评论和投币
 - 通知点击后直接打开对应帖子
 - 支持网页文件选择、返回键和离线状态提示
+- Android 浏览器访问时显示“用 App 浏览更顺畅”推荐条，排除 App 自身 WebView、其他内嵌 WebView 和爬虫
+- 关于页仅对 Android 网页显示“下载 Android App”按钮，iOS、桌面端和 App 内均不显示
+- 站内下载地址：`/download/jz-pulse.apk`，APK 文件放在 `data/downloads/jz-pulse.apk`
 
 构建需要 Android SDK Platform 36、Build Tools、JDK 17，并设置 `ANDROID_SDK_ROOT`：
 
