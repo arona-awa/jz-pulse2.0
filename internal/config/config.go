@@ -9,7 +9,7 @@ import (
 )
 
 // Version 当前应用版本号，用于检查更新
-const Version = "2.1.55"
+const Version = "2.1.56"
 
 // Cfg 全局配置单例
 var Cfg Config

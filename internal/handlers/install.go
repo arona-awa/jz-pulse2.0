@@ -85,7 +85,7 @@ func InstallSubmit(w http.ResponseWriter, r *http.Request) {
 		"site_name": siteName, "theme": "default", "allow_register": "1",
 		"require_login_post": "0", "ai_enabled": "0", "ai_autopatrol": "0",
 		"ai_precheck": "0", "community_rules": "禁止发布违法违规、暴力、色情、辱骂及广告刷屏内容。",
-		"ai_vision": "0", "ai_precheck_fail": "open", "ai_auto_delete": "0", "ai_auto_ban": "0",
+		"ai_vision": "0", "ai_precheck_fail": "closed", "ai_auto_delete": "0", "ai_auto_ban": "0",
 		"update_url":      "https://clearlove.kazx.top/update",
 		"donate_img":      "https://clearlove.kazx.top/%E6%8D%90%E8%B5%A0.webp",
 		"enabled_plugins": "[]",

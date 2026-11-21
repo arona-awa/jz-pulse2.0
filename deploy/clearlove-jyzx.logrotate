@@ -1,0 +1,12 @@
+# /etc/logrotate.d/clearlove-jyzx
+# systemd 服务用 StandardOutput=append: 写 server.log 时使用 copytruncate，
+# 这样无需重启服务，日志文件描述符仍指向原 inode。
+/www/wwwroot/jyzx.top/server.log {
+    daily
+    rotate 14
+    maxsize 50M
+    compress
+    missingok
+    notifempty
+    copytruncate
+}

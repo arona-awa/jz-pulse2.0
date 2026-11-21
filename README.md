@@ -33,7 +33,7 @@
 
 ## 技术栈
 
-- Go 1.27+
+- Go 1.27.4+（包含 stdlib 安全修复）
 - `html/template` + `embed`
 - SQLite（默认）或 MySQL
 - 原生 JavaScript / CSS，无前端构建步骤
@@ -105,6 +105,9 @@ CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
 - SQLite 数据库默认在 `data/clearlove.db`
 - 上传文件在 `uploads/`
 - SMTP、AI 审核、站点域名、插件配置均在后台设置，**不写入源码**
+- AI 使用 OpenAI 兼容接口。`ai_base` 只填 Base URL，例如 `https://api.deepseek.com`，不要填 `/v4` 或完整的 `/chat/completions`；当前 DeepSeek 可使用 `deepseek-flash`
+- 启用中的 AI 配置在后台保存时会先做一次最小对话校验；校验失败不会写入数据库
+- `ai_precheck_fail` 默认 `closed`：审核服务异常时阻止发布，避免审核静默失效
 
 以下内容已在 `.gitignore` 中排除，不应提交到公开仓库：
 
@@ -133,6 +136,17 @@ config.json
 - 定期备份 `data/` 与 `uploads/`；
 - 首次部署后立即设置强管理员密码，并关闭不需要的注册/上传功能；
 - 若使用 MySQL，请在安装向导中填写 DSN，不要将 DSN 提交到仓库。
+
+### 日志轮转
+
+如果 systemd 使用 `StandardOutput=append:<path>/server.log`，请安装仓库内的 logrotate 示例，避免日志无限增长：
+
+```bash
+install -m 644 deploy/clearlove-jyzx.logrotate /etc/logrotate.d/clearlove-jyzx
+logrotate -d /etc/logrotate.d/clearlove-jyzx   # 检查配置
+```
+
+示例策略为每日轮转、单文件超过 50MB 提前轮转、保留 14 份并压缩，使用 `copytruncate` 适配 systemd 持有文件描述符。请按实际部署路径修改示例中的 `server.log` 路径。
 
 ## 开源说明
 

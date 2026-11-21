@@ -57,6 +57,12 @@ func main() {
 	handlers.RebuildTemplates()
 
 	go ai.StartPatrol() // AI 自动巡查（每10分钟，仅在开启时工作）
+	// 启动时对已启用的 AI 配置做一次连通性检查；失败只记录一条去重日志，不阻塞服务。
+	go func() {
+		if err := ai.ValidateStoredConfig(); err != nil {
+			ai.LogFailure("启动校验", err)
+		}
+	}()
 
 	// 监听端口：PORT 或 CLEARLOVE_PORT，默认 16868
 	addr := ":16868"

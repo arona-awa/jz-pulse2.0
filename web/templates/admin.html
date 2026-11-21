@@ -89,6 +89,7 @@
 {{/* ============ 网站设置 ============ */}}
 {{define "pg_admin_settings"}}
 <h1 class="page-title">网站设置</h1>
+{{with .err}}<p class="form-err">{{.}}</p>{{end}}
 <form method="post" action="/admin/settings" class="settings-form">
   <input type="hidden" name="_csrf" value="{{.csrf}}">
 
@@ -143,16 +144,18 @@
     <h3>AI 模型接入 <small>OpenAI 格式接口，开启后启用全站 AI 功能</small></h3>
     <label class="check-row"><input type="checkbox" name="ai_enabled" value="1" {{if eq .s.ai_enabled "1"}}checked{{end}}> 启用 AI 功能</label>
     <div class="grid2">
-      <label>接口地址<input type="text" name="ai_base" value="{{.s.ai_base}}" placeholder="https://api.deepseek.com/v1"></label>
-      <label>模型名<input type="text" name="ai_model" value="{{.s.ai_model}}" placeholder="deepseek-chat"></label>
+      <label>接口地址<input type="text" name="ai_base" value="{{.s.ai_base}}" placeholder="https://api.deepseek.com"></label>
+      <label>模型名<input type="text" name="ai_model" value="{{.s.ai_model}}" placeholder="deepseek-flash"></label>
     </div>
+    <p class="muted">只填 Base URL（例如 https://api.deepseek.com），不要带 /v4 或 /chat/completions。保存启用中的 AI 配置时，系统会先做一次最小请求校验地址、Key 和模型。</p>
     <label>API Key<input type="password" name="ai_key" value="{{.s.ai_key}}"></label>
     <label class="check-row"><input type="checkbox" name="ai_autopatrol" value="1" {{if eq .s.ai_autopatrol "1"}}checked{{end}}> 开启 AI 智能体自动巡查（每10分钟一次，对未审过的帖子和评论执行保留/隐藏/删除并留痕）</label>
     <label class="check-row"><input type="checkbox" name="ai_precheck" value="1" {{if eq .s.ai_precheck "1"}}checked{{end}}> 发帖与评论自动审核（违规阻止发布并提示用户修改）</label>
     <label class="check-row"><input type="checkbox" name="ai_vision" value="1" {{if eq .s.ai_vision "1"}}checked{{end}}> 启用图片审核（需多模态模型，如 gpt-4o / qwen-vl；发帖与巡查时自动识别图片违规内容）</label>
     <label class="check-row"><input type="checkbox" name="ai_auto_delete" value="1" {{if eq .s.ai_auto_delete "1"}}checked{{end}}> 允许 AI 直接删除严重违规内容（默认关闭：AI 判定删除时降级为隐藏，由人工确认删除，防误判丢数据）</label>
     <label class="check-row"><input type="checkbox" name="ai_auto_ban" value="1" {{if eq .s.ai_auto_ban "1"}}checked{{end}}> AI 删除时自动封禁发布者（IP 与浏览器指纹，仅配合上一项生效）</label>
-    <label class="check-row"><input type="checkbox" name="ai_precheck_fail" value="closed" {{if eq .s.ai_precheck_fail "closed"}}checked{{end}}> 审核服务异常时阻止发布（默认关闭：异常时放行内容，仅记录日志；开启则提示用户稍后重试）</label>
+    <label class="check-row"><input type="radio" name="ai_precheck_fail" value="closed" {{if ne .s.ai_precheck_fail "open"}}checked{{end}}> 审核服务异常时阻止发布（推荐，默认）：提示用户稍后重试</label>
+    <label class="check-row"><input type="radio" name="ai_precheck_fail" value="open" {{if eq .s.ai_precheck_fail "open"}}checked{{end}}> 审核服务异常时放行：仅记录日志，不阻断发布</label>
   </div>
 
   <div class="card">

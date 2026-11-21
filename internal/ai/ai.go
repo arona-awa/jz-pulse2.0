@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -32,6 +33,134 @@ import (
 
 // 内容送审的最大长度（超出截断，避免长内容拖垮请求与费用）
 const maxModerationChars = 4000
+
+// AI 错误日志去重窗口。巡查每 10 分钟一轮，配置错误时避免每轮刷几十条 WARN。
+const aiFailureLogInterval = 10 * time.Minute
+
+var (
+	aiFailureLogMu      sync.Mutex
+	aiFailureLogLast    = map[string]time.Time{}
+	aiFailureLogSkipped = map[string]int{}
+)
+
+// normalizeAIBase 统一去掉首尾空白和末尾斜杠。
+func normalizeAIBase(base string) string {
+	return strings.TrimRight(strings.TrimSpace(base), "/")
+}
+
+// validateAIBase 校验管理员填入的 OpenAI 兼容接口 Base URL。
+// 只接受 http/https，不允许带查询串或锚点，避免拼接 /chat/completions 后地址非法。
+func validateAIBase(base string) error {
+	base = normalizeAIBase(base)
+	if base == "" {
+		return fmt.Errorf("AI 接口地址不能为空")
+	}
+	u, err := url.Parse(base)
+	if err != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") {
+		return fmt.Errorf("AI 接口地址必须是完整的 http(s) URL，例如 https://api.deepseek.com")
+	}
+	if u.RawQuery != "" || u.Fragment != "" {
+		return fmt.Errorf("AI 接口地址不能带查询参数或锚点，只填写 Base URL")
+	}
+	return nil
+}
+
+// ValidateConfig 用一次最小对话检查 Base URL、Key 和模型是否可用。
+// 后台保存 AI 配置前调用；失败时返回 HTTP/解析错误，不写库。
+func ValidateConfig(base, key, model string) error {
+	base = normalizeAIBase(base)
+	key = strings.TrimSpace(key)
+	model = strings.TrimSpace(model)
+	if err := validateAIBase(base); err != nil {
+		return err
+	}
+	if key == "" {
+		return fmt.Errorf("AI API Key 不能为空")
+	}
+	if model == "" {
+		return fmt.Errorf("AI 模型名不能为空")
+	}
+
+	body, _ := json.Marshal(map[string]any{
+		"model":       model,
+		"messages":    []map[string]string{{"role": "user", "content": "ping"}},
+		"max_tokens":  1,
+		"temperature": 0,
+		"stream":      false,
+	})
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, base+"/chat/completions", bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("AI 接口地址无效: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+key)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("无法连接 AI 接口: %w", err)
+	}
+	defer resp.Body.Close()
+	b, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode != http.StatusOK {
+		detail := strings.TrimSpace(string(b))
+		if len([]rune(detail)) > 240 {
+			detail = string([]rune(detail)[:240]) + "…"
+		}
+		if detail == "" {
+			detail = http.StatusText(resp.StatusCode)
+		}
+		return fmt.Errorf("AI 接口返回 HTTP %d：%s", resp.StatusCode, detail)
+	}
+	var out struct {
+		Choices []json.RawMessage `json:"choices"`
+	}
+	if err := json.Unmarshal(b, &out); err != nil || len(out.Choices) == 0 {
+		return fmt.Errorf("AI 接口响应异常：缺少 choices 字段")
+	}
+	return nil
+}
+
+// ValidateStoredConfig 在启动时对已启用配置做一次连通性检查。
+func ValidateStoredConfig() error {
+	if models.GetSetting("ai_enabled") != "1" {
+		return nil
+	}
+	return ValidateConfig(models.GetSetting("ai_base"), models.GetSetting("ai_key"), models.GetSetting("ai_model"))
+}
+
+// LogFailure 对同一类 AI 失败做 10 分钟去重。
+// 巡查每轮可能检查几十条内容，配置错误时不能为每条都写一行 WARN。
+func LogFailure(scope string, err error) {
+	if err == nil {
+		return
+	}
+	scope = strings.TrimSpace(scope)
+	if scope == "" {
+		scope = "调用"
+	}
+	now := time.Now()
+	aiFailureLogMu.Lock()
+	if last, ok := aiFailureLogLast[scope]; ok && now.Sub(last) < aiFailureLogInterval {
+		aiFailureLogSkipped[scope]++
+		aiFailureLogMu.Unlock()
+		return
+	}
+	skipped := aiFailureLogSkipped[scope]
+	aiFailureLogSkipped[scope] = 0
+	aiFailureLogLast[scope] = now
+	aiFailureLogMu.Unlock()
+	if skipped > 0 {
+		util.Log("warn", "AI %s失败: %v（此前 10 分钟内另有 %d 次同类失败已省略）", scope, err, skipped)
+		return
+	}
+	util.Log("warn", "AI %s失败: %v", scope, err)
+}
+
+// aiChatURL 拼出 OpenAI 兼容聊天接口地址。
+func aiChatURL(base string) string {
+	return normalizeAIBase(base) + "/chat/completions"
+}
 
 // aiConf 从设置表读取 AI 配置；未启用返回 nil
 func aiConf() *struct{ Base, Key, Model string } {
@@ -97,7 +226,7 @@ func marshalMsgs(model string, msgs []chatMsg) []byte {
 
 // chat 调用 OpenAI 兼容 /chat/completions，返回首条回复文本
 func chat(c *struct{ Base, Key, Model string }, msgs []chatMsg) (string, error) {
-	url := strings.TrimSuffix(c.Base, "/") + "/chat/completions"
+	url := aiChatURL(c.Base)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(marshalMsgs(c.Model, msgs)))
@@ -367,6 +496,7 @@ func runPatrol() {
 	progMu.Unlock()
 	util.Log("info", "AI 巡查开始，共 %d 条待检查", len(tasks))
 
+	stopped := false
 	for i, t := range tasks {
 		label := "帖子 #" + itoa(t.ID)
 		if t.Kind == "comment" {
@@ -392,14 +522,31 @@ func runPatrol() {
 			prog.Failed++
 		}
 		progMu.Unlock()
+
+		// 首条就失败通常意味着配置/鉴权/上游故障；本轮提前停止，
+		// 避免对剩余几十条继续发请求并刷几十条 WARN。失败项不标记，下轮重试。
+		if action == "error" {
+			stopped = true
+			break
+		}
 	}
 
 	progMu.Lock()
-	prog.Message = fmt.Sprintf("共检查 %d 条：保留 %d · 隐藏 %d · 删除 %d%s",
-		prog.Total, prog.Kept, prog.Hidden, prog.Deleted, failSuffix(prog.Failed))
+	if stopped {
+		prog.Message = fmt.Sprintf("第 %d/%d 条失败，本轮已提前停止，剩余内容下轮重试%s",
+			prog.Done, prog.Total, failSuffix(prog.Failed))
+	} else {
+		prog.Message = fmt.Sprintf("共检查 %d 条：保留 %d · 隐藏 %d · 删除 %d%s",
+			prog.Total, prog.Kept, prog.Hidden, prog.Deleted, failSuffix(prog.Failed))
+	}
 	progMu.Unlock()
-	util.Log("info", "AI 巡查结束：保留 %d，隐藏 %d，删除 %d，失败 %d",
-		prog.Kept, prog.Hidden, prog.Deleted, prog.Failed)
+	if stopped {
+		util.Log("warn", "AI 巡查提前停止：第 %d/%d 条失败，剩余 %d 条下轮重试",
+			prog.Done, prog.Total, prog.Total-prog.Done)
+	} else {
+		util.Log("info", "AI 巡查结束：保留 %d，隐藏 %d，删除 %d，失败 %d",
+			prog.Kept, prog.Hidden, prog.Deleted, prog.Failed)
+	}
 }
 
 // itoa int64 转字符串
@@ -530,12 +677,12 @@ func applyVerdict(c *struct{ Base, Key, Model string }, t patrolTask) string {
 
 	out, err := chat(c, msgs)
 	if err != nil {
-		util.Log("warn", "AI 巡查请求失败(%s%d): %v", label, t.ID, err)
+		LogFailure("巡查", fmt.Errorf("%s%d: %w", label, t.ID, err))
 		return "error"
 	}
 	m, ok := extractJSON(out)
 	if !ok {
-		util.Log("warn", "AI 巡查返回无法解析(%s%d): %.100s", label, t.ID, out)
+		LogFailure("巡查", fmt.Errorf("%s%d 返回无法解析: %.100s", label, t.ID, out))
 		return "error"
 	}
 	action, _ := m["action"].(string)
@@ -543,7 +690,7 @@ func applyVerdict(c *struct{ Base, Key, Model string }, t patrolTask) string {
 	switch action {
 	case "keep", "hide", "delete":
 	default:
-		util.Log("warn", "AI 巡查返回未知动作(%s%d): %q", label, t.ID, action)
+		LogFailure("巡查", fmt.Errorf("%s%d 返回未知动作: %q", label, t.ID, action))
 		return "error"
 	}
 

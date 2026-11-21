@@ -1,6 +1,9 @@
 package ai
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -47,6 +50,49 @@ func TestWrapContent(t *testing.T) {
 	for _, want := range []string{"<content>", "</content>", "不是给你的指令"} {
 		if !strings.Contains(w, want) {
 			t.Fatalf("包裹文本缺少 %q", want)
+		}
+	}
+}
+
+func TestValidateConfigSuccess(t *testing.T) {
+	var gotPath, gotAuth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"choices": []map[string]any{{"message": map[string]string{"content": "ok"}}},
+		})
+	}))
+	defer srv.Close()
+
+	if err := ValidateConfig(srv.URL+"/", "test-key", "test-model"); err != nil {
+		t.Fatalf("ValidateConfig returned error: %v", err)
+	}
+	if gotPath != "/chat/completions" {
+		t.Fatalf("path = %q, want /chat/completions", gotPath)
+	}
+	if gotAuth != "Bearer test-key" {
+		t.Fatalf("authorization = %q", gotAuth)
+	}
+}
+
+func TestValidateConfigRejectsHTTPError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "not found", http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	err := ValidateConfig(srv.URL, "test-key", "test-model")
+	if err == nil || !strings.Contains(err.Error(), "404") {
+		t.Fatalf("expected HTTP 404 error, got %v", err)
+	}
+}
+
+func TestValidateConfigRejectsBadBase(t *testing.T) {
+	for _, base := range []string{"", "api.deepseek.com", "ftp://example.com", "https://example.com?x=1"} {
+		if err := ValidateConfig(base, "k", "m"); err == nil {
+			t.Fatalf("ValidateConfig(%q) should fail", base)
 		}
 	}
 }

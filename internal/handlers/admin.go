@@ -13,6 +13,7 @@ import (
 	"io/fs"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -217,7 +218,7 @@ func AdminSettings(w http.ResponseWriter, r *http.Request) {
 		s[k] = models.GetSetting(k)
 	}
 	Render(w, r, "admin_layout.html", "pg_admin_settings", map[string]any{
-		"s": s, "themes": themeList(),
+		"s": s, "themes": themeList(), "err": r.URL.Query().Get("err"),
 	})
 }
 
@@ -246,6 +247,38 @@ func AdminSettingsSave(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	// 保存 AI 配置前做一次真实连通性测试，避免把 /v4 之类的错误地址写进库。
+	// 只在“启用 AI 或修改连接参数”时测试，日常改其它设置不会额外请求上游。
+	valueOrCurrent := func(key string) string {
+		if v, ok := vals[key]; ok {
+			return v
+		}
+		return models.GetSetting(key)
+	}
+	if r.FormValue("ai_enabled") == "1" {
+		base := valueOrCurrent("ai_base")
+		key := valueOrCurrent("ai_key")
+		model := valueOrCurrent("ai_model")
+		featureTurnedOn := (r.FormValue("ai_precheck") == "1" && models.GetSetting("ai_precheck") != "1") ||
+			(r.FormValue("ai_autopatrol") == "1" && models.GetSetting("ai_autopatrol") != "1")
+		changed := models.GetSetting("ai_enabled") != "1" ||
+			base != models.GetSetting("ai_base") ||
+			key != models.GetSetting("ai_key") ||
+			model != models.GetSetting("ai_model") ||
+			featureTurnedOn
+		if changed {
+			if err := ai.ValidateConfig(base, key, model); err != nil {
+				msg := "AI 配置校验失败：" + err.Error()
+				if isAJAX(r) {
+					fail(w, http.StatusBadRequest, msg)
+					return
+				}
+				http.Redirect(w, r, "/admin/settings?err="+url.QueryEscape(msg), http.StatusSeeOther)
+				return
+			}
+		}
+	}
+
 	for k, v := range vals {
 		_ = models.SetSetting(k, v)
 	}
@@ -257,10 +290,10 @@ func AdminSettingsSave(w http.ResponseWriter, r *http.Request) {
 		}
 		_ = models.SetSetting(k, v)
 	}
-	// 预审失败策略：勾选=拦截发布（closed），默认放行（open）
-	failMode := "open"
-	if r.FormValue("ai_precheck_fail") == "closed" {
-		failMode = "closed"
+	// 预审失败策略默认 closed：AI 异常时宁可拦截，也不静默放行。
+	failMode := "closed"
+	if r.FormValue("ai_precheck_fail") == "open" {
+		failMode = "open"
 	}
 	_ = models.SetSetting("ai_precheck_fail", failMode)
 	if v := r.FormValue("theme"); v != "" {

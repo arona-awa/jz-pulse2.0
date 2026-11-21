@@ -535,8 +535,8 @@ func ComposeSubmit(w http.ResponseWriter, r *http.Request) {
 	if models.GetSetting("ai_precheck") == "1" {
 		bad, reason, err := ai.Moderate(content, mediaPaths)
 		if err != nil {
-			util.Log("warn", "AI 发帖预审失败: %v", err)
-			if models.GetSetting("ai_precheck_fail") == "closed" {
+			ai.LogFailure("发帖预审", err)
+			if models.GetSetting("ai_precheck_fail") != "open" {
 				fail(w, 503, "自动审核服务暂时不可用，请稍后再试")
 				return
 			}
@@ -627,8 +627,8 @@ func addComment(postID int64, nickname, content, fp string, u *models.User) (int
 	if models.GetSetting("ai_precheck") == "1" {
 		bad, reason, err := ai.Moderate(content, nil)
 		if err != nil {
-			util.Log("warn", "AI 评论预审失败: %v", err)
-			if models.GetSetting("ai_precheck_fail") == "closed" {
+			ai.LogFailure("评论预审", err)
+			if models.GetSetting("ai_precheck_fail") != "open" {
 				return 0, "自动审核服务暂时不可用，请稍后再试"
 			}
 		} else if bad {
