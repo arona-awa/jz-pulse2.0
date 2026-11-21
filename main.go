@@ -227,6 +227,7 @@ func buildMux() *http.ServeMux {
 	mux.HandleFunc("POST /api/v1/posts/{id}/tip", handlers.APITip)
 	mux.HandleFunc("POST /api/v1/comments", handlers.APIComment)
 	mux.HandleFunc("GET /api/v1/topics", handlers.APITopics)
+	mux.HandleFunc("GET /api/v1/events", handlers.APIEvents)
 	mux.HandleFunc("POST /api/v1/reports", handlers.APIReport)
 
 	// 后台管理

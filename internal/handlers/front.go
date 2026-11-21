@@ -557,6 +557,7 @@ func ComposeSubmit(w http.ResponseWriter, r *http.Request) {
 	}
 	pid, _ := res.LastInsertId()
 	models.AwardDailyPost(userIDOf(user))
+	models.AddEvent("post", userIDOf(user), 0, pid, 0)
 	for _, m := range media {
 		_, _ = database.DB.Exec(
 			"INSERT INTO medias(post_id,type,path,created_at) VALUES(?,?,?,?)", pid, m.typ, m.path, models.Now())
@@ -649,6 +650,11 @@ func addComment(postID int64, nickname, content, fp string, u *models.User) (int
 	}
 	cid, _ := res.LastInsertId()
 	_, _ = database.DB.Exec("UPDATE posts SET comment_count=comment_count+1 WHERE id=?", postID)
+	var ownerID int64
+	_ = database.DB.QueryRow("SELECT user_id FROM posts WHERE id=?", postID).Scan(&ownerID)
+	if ownerID > 0 {
+		models.AddEvent("comment", userIDOf(u), ownerID, postID, cid)
+	}
 	plugin.Emit("comment_created", map[string]any{"post_id": postID, "content": content})
 	return cid, ""
 }

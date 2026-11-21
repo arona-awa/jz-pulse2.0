@@ -64,11 +64,10 @@ func APILike(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// 点赞身份：优先浏览器指纹，登录用户回退到账号 ID
+	u := CurrentUser(r)
 	fp := util.FingerprintOf(r)
-	if fp == "" {
-		if u := CurrentUser(r); u != nil {
-			fp = "u" + int64ToStr(u.ID)
-		}
+	if fp == "" && u != nil {
+		fp = "u" + int64ToStr(u.ID)
 	}
 	if fp == "" {
 		fail(w, 400, "无法识别点赞身份，请刷新页面后重试")
@@ -76,7 +75,12 @@ func APILike(w http.ResponseWriter, r *http.Request) {
 	}
 	n, liked := toggleLike(postID, fp)
 	if liked {
-		if u := CurrentUser(r); u != nil {
+		var ownerID int64
+		_ = database.DB.QueryRow("SELECT user_id FROM posts WHERE id=?", postID).Scan(&ownerID)
+		if ownerID > 0 {
+			models.AddEvent("like", userIDOf(u), ownerID, postID, 0)
+		}
+		if u != nil {
 			models.AwardDailyLike(u.ID)
 		}
 	}
@@ -179,6 +183,67 @@ func APITopics(w http.ResponseWriter, r *http.Request) {
 	okJSON(w, map[string]any{"topics": listTopics()})
 }
 
+// APIEvents 返回当前用户的通知事件（Android 客户端轮询使用）。
+// latest=1 只返回当前最大游标，用于首次安装/切换账号时避免补发历史通知。
+func APIEvents(w http.ResponseWriter, r *http.Request) {
+	u := CurrentUser(r)
+	if u == nil {
+		fail(w, http.StatusUnauthorized, "请先登录")
+		return
+	}
+	if r.URL.Query().Get("latest") == "1" {
+		okJSON(w, map[string]any{
+			"user_id": u.ID,
+			"cursor":  models.QueryInt("SELECT IFNULL(MAX(id),0) FROM events"),
+			"events":  []any{},
+		})
+		return
+	}
+	after := formInt64(r, "after")
+	limit := int(formInt64(r, "limit"))
+	if limit <= 0 || limit > 50 {
+		limit = 20
+	}
+	rows, err := database.DB.Query(`
+		SELECT e.id, e.kind, e.post_id, IFNULL(e.ref_id,0), IFNULL(e.created_at,''),
+		       IFNULL(au.username,'访客'), IFNULL(p.nickname,'匿名'), IFNULL(p.content,'')
+		FROM events e
+		LEFT JOIN users au ON au.id=e.actor_id
+		LEFT JOIN posts p ON p.id=e.post_id
+		WHERE e.id>? AND (e.target_id=0 OR e.target_id=?) AND e.actor_id<>?
+		ORDER BY e.id ASC LIMIT ?`, after, u.ID, u.ID, limit)
+	if err != nil {
+		fail(w, http.StatusInternalServerError, "读取通知失败")
+		return
+	}
+	defer rows.Close()
+	events := make([]map[string]any, 0, limit)
+	cursor := after
+	for rows.Next() {
+		var id, postID, refID int64
+		var kind, createdAt, actor, nickname, content string
+		if rows.Scan(&id, &kind, &postID, &refID, &createdAt, &actor, &nickname, &content) != nil {
+			continue
+		}
+		excerpt := []rune(strings.TrimSpace(content))
+		if len(excerpt) > 80 {
+			excerpt = append(excerpt[:80], '…')
+		}
+		events = append(events, map[string]any{
+			"id":         id,
+			"type":       kind,
+			"post_id":    postID,
+			"ref_id":     refID,
+			"created_at": createdAt,
+			"actor":      actor,
+			"nickname":   nickname,
+			"excerpt":    string(excerpt),
+		})
+		cursor = id
+	}
+	okJSON(w, map[string]any{"user_id": u.ID, "cursor": cursor, "events": events})
+}
+
 // APIReport 提交举报（匿名可用）
 func APIReport(w http.ResponseWriter, r *http.Request) {
 	postID := formInt64(r, "post_id")
@@ -271,6 +336,7 @@ func APICreatePost(w http.ResponseWriter, r *http.Request) {
 	}
 	pid, _ := res.LastInsertId()
 	models.AwardDailyPost(userIDOf(u))
+	models.AddEvent("post", userIDOf(u), 0, pid, 0)
 	for _, p := range body.Images {
 		if strings.HasPrefix(p, "/uploads/") {
 			_, _ = database.DB.Exec("INSERT INTO medias(post_id,type,path,created_at) VALUES(?,?,?,?)", pid, "image", p, models.Now())

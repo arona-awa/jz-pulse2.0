@@ -179,6 +179,7 @@ func TipPost(postID, fromID int64, coins int, withLike bool, fingerprint string)
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("投币失败，请稍后再试")
 	}
+	AddEvent("tip", fromID, toID, postID, int64(coins))
 	return &CoinTipResult{
 		BalanceTenths: balance - cost,
 		Coins:         coins,

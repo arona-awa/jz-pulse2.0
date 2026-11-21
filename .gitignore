@@ -16,6 +16,11 @@ clearlove-*-linux-amd64
 jz-pulse
 jz-pulse-*
 *.zip
+android/build/
+android/debug.keystore
+android/*.apk
+android/*.idsig
+android/jz-pulse.apk
 
 # 本地开发/备份
 .env

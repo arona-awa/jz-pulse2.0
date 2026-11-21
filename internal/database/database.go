@@ -138,6 +138,10 @@ CREATE TABLE IF NOT EXISTS coin_tips (
 	id {PK}, post_id {I} DEFAULT 0, from_user_id {I} DEFAULT 0, to_user_id {I} DEFAULT 0,
 	coins {I} DEFAULT 0, xp_sender {I} DEFAULT 0, xp_recipient {I} DEFAULT 0, created_at VARCHAR(40)
 );
+CREATE TABLE IF NOT EXISTS events (
+	id {PK}, kind VARCHAR(16) DEFAULT '', actor_id {I} DEFAULT 0, target_id {I} DEFAULT 0,
+	post_id {I} DEFAULT 0, ref_id {I} DEFAULT 0, created_at VARCHAR(40)
+);
 `
 
 // Migrate 安装时自动建表并创建索引，可重复执行（幂等）
@@ -223,6 +227,8 @@ func Migrate() error {
 		"CREATE INDEX idx_coin_tips_post ON coin_tips (post_id)",
 		"CREATE INDEX idx_coin_tips_to ON coin_tips (to_user_id)",
 		"CREATE INDEX idx_coin_tips_from_to ON coin_tips (from_user_id, to_user_id, created_at)",
+		"CREATE INDEX idx_events_target ON events (target_id, id)",
+		"CREATE INDEX idx_events_actor ON events (actor_id, id)",
 	}
 	for _, ix := range indexes {
 		_, _ = DB.Exec(ix)

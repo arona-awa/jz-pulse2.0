@@ -30,6 +30,7 @@
 - 开屏画面、用户协议、隐私政策、使用手册
 - 可视化后台：内容、用户、评论、公告、设置、插件、API Key、数据迁移
 - 插件系统：声明式 / 应用型插件，支持模板覆盖
+- Android 客户端：复用网站页面与素材，支持本地缓存、离线查看和动态通知（新帖、点赞、评论、投币）
 
 ## 技术栈
 
@@ -128,6 +129,27 @@ config.json
 插件开发文档见 [docs/PLUGIN.md](docs/PLUGIN.md)、[docs/PLUGIN-APP.md](docs/PLUGIN-APP.md)、[docs/PLUGIN-V3.md](docs/PLUGIN-V3.md)。
 
 本项目不包含线上站点使用的全部第三方/定制插件，部署者可按需安装。
+
+## Android 客户端
+
+`android/` 目录是一个不依赖 AndroidX/Google 服务的原生 WebView 客户端：
+
+- 直接加载 `https://jz-wall.top`，复用网站 CSS、JS、图片和页面
+- WebView 缓存静态资源；HTML 与 `/api/` JSON 另存本地 SQLite，断网时可查看缓存内容
+- App 打开时每 30 秒、后台每 15 分钟轮询 `/api/v1/events`，通过系统通知提示新帖、点赞、评论和投币
+- 通知点击后直接打开对应帖子
+- 支持网页文件选择、返回键和离线状态提示
+
+构建需要 Android SDK Platform 36、Build Tools、JDK 17，并设置 `ANDROID_SDK_ROOT`：
+
+```bash
+cd android
+./build.sh
+```
+
+详细说明见 [android/README.md](android/README.md)。
+
+通知说明：当前使用系统 JobScheduler 轮询，不使用 FCM；后台通知最迟约 15 分钟到达，App 打开时约 30 秒轮询一次。若需要被系统杀死后即时推送，需要额外接入 FCM 或其他推送服务。
 
 ## 部署提示
 
