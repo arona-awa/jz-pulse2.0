@@ -419,6 +419,23 @@
     renderSelection();
   }
 
+  function initAppRecommend() {
+    var box = document.getElementById('app-recommend');
+    if (!box) return;
+    var key = 'clv_app_recommend_until';
+    var until = 0;
+    try { until = Number(localStorage.getItem(key)) || 0; } catch (e) { }
+    if (until > Date.now()) return;
+    box.hidden = false;
+    var close = box.querySelector('[data-app-dismiss]');
+    if (close) {
+      close.addEventListener('click', function () {
+        try { localStorage.setItem(key, String(Date.now() + 30 * 24 * 60 * 60 * 1000)); } catch (e) { }
+        box.hidden = true;
+      });
+    }
+  }
+
   function initNotice() {
     var bar = document.getElementById('notice-bar');
     if (!bar) return;
@@ -2147,6 +2164,7 @@
   document.addEventListener('DOMContentLoaded', function () {
     initSplash();
     initTip();
+    initAppRecommend();
     initNotice();
     initMasonry();
     initCommentForm();

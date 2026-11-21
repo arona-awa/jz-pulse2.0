@@ -175,6 +175,7 @@ func buildMux() *http.ServeMux {
 	mux.HandleFunc("GET /favicon.ico", handlers.FaviconICO)
 	mux.HandleFunc("GET /theme.css", handlers.ThemeCSS)
 	mux.Handle("GET /uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir(config.Cfg.UploadDir))))
+	mux.HandleFunc("GET /download/jz-pulse.apk", handlers.AppDownload)
 
 	// 安装向导
 	mux.HandleFunc("GET /install", handlers.InstallPage)

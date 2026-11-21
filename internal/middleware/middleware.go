@@ -164,6 +164,7 @@ func Use(next http.Handler) http.Handler {
 func isAssetPath(p string) bool {
 	return strings.HasPrefix(p, "/static/") ||
 		strings.HasPrefix(p, "/uploads/") ||
+		strings.HasPrefix(p, "/download/") ||
 		p == "/theme.css" || p == "/favicon.svg" || p == "/favicon.ico"
 }
 
@@ -181,6 +182,9 @@ func setAssetCache(w http.ResponseWriter, r *http.Request) {
 	case strings.HasPrefix(p, "/uploads/"):
 		// 上传文件名随机，内容不会原地变化，可长期缓存。
 		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+	case strings.HasPrefix(p, "/download/"):
+		// APK 同 URL 更新时最多 1 小时缓存；下载地址的 ?v= 用于主动刷新。
+		w.Header().Set("Cache-Control", "public, max-age=3600")
 	case p == "/theme.css":
 		// 主题可在后台即时切换，使用短缓存。
 		w.Header().Set("Cache-Control", "public, max-age=300")

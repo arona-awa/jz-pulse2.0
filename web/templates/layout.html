@@ -63,7 +63,17 @@ setTimeout(function () {
   </nav>
 </header>
 
-
+{{if and .androidWeb (ne .Page "pg_install")}}
+<div class="app-recommend" id="app-recommend" data-app-recommend hidden>
+  <img class="app-recommend-icon" src="/static/favicon-192x192.png?v={{.clvVersion}}" alt="姜中Pulse App">
+  <div class="app-recommend-copy">
+    <strong>用 App 浏览更顺畅</strong>
+    <span>支持离线查看、新帖与互动通知</span>
+  </div>
+  <a class="app-recommend-download" href="{{.appDownloadURL}}" download>下载 App</a>
+  <button class="app-recommend-close" type="button" data-app-dismiss aria-label="暂不下载">稍后</button>
+</div>
+{{end}}
 
 <main class="container">
 {{pageContent .Page .}}

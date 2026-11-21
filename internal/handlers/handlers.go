@@ -137,6 +137,8 @@ func Render(w http.ResponseWriter, r *http.Request, layout, page string, data ma
 	data["site"] = models.GetSetting("site_name")
 	data["bg"] = models.GetSetting("theme_bg")
 	data["donate"] = models.GetSetting("donate_img")
+	data["androidWeb"] = isAndroidWeb(r) && page != "pg_install"
+	data["appDownloadURL"] = "/download/jz-pulse.apk?v=1.0"
 	u := CurrentUser(r)
 	data["myLevel"] = models.LevelForExp(0)
 	data["canFood"] = false
@@ -190,6 +192,22 @@ func Render(w http.ResponseWriter, r *http.Request, layout, page string, data ma
 	if err := Tmpl.ExecuteTemplate(w, layout, data); err != nil {
 		util.Log("error", "模板渲染失败 %s: %v", page, err)
 	}
+}
+
+// isAndroidWeb 判断是否应在网页端推荐 Android App。
+// 排除 App 自己的 WebView（JZPulseApp）、其他 App 内嵌 WebView（; wv）和爬虫。
+func isAndroidWeb(r *http.Request) bool {
+	ua := strings.ToLower(r.UserAgent())
+	if !strings.Contains(ua, "android") {
+		return false
+	}
+	if strings.Contains(ua, "jzpulseapp/") || strings.Contains(ua, "; wv") {
+		return false
+	}
+	if strings.Contains(ua, "bot") || strings.Contains(ua, "spider") || strings.Contains(ua, "crawler") {
+		return false
+	}
+	return true
 }
 
 // JSON 输出 JSON 响应

@@ -126,6 +126,38 @@ button { font-family: inherit; }
 }
 .brand { font-weight: 700; font-size: 17px; letter-spacing: .5px; }
 .topnav { display: flex; align-items: center; gap: 8px; }
+
+/* Android 网页端 App 推荐条：仅服务端按 UA 渲染，App WebView 不会出现 */
+.app-recommend {
+  display: flex; align-items: center; gap: 10px;
+  width: min(720px, calc(100vw - 24px));
+  margin: 10px auto 0; padding: 10px 12px;
+  border: 1px solid var(--clv-border); border-radius: 14px;
+  background: color-mix(in srgb, var(--clv-card) 92%, transparent);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .16);
+}
+.app-recommend[hidden] { display: none; }
+.app-recommend-icon {
+  width: 38px; height: 38px; border-radius: 10px; object-fit: cover; flex: 0 0 auto;
+}
+.app-recommend-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.app-recommend-copy strong { font-size: 13px; }
+.app-recommend-copy span { font-size: 11px; color: var(--clv-muted); }
+.app-recommend-download {
+  flex: 0 0 auto; padding: 7px 11px; border-radius: 999px;
+  color: #fff; font-size: 12px; font-weight: 600; text-decoration: none;
+  background: linear-gradient(135deg, var(--clv-accent), var(--clv-accent-2));
+}
+.app-recommend-close {
+  flex: 0 0 auto; border: 0; background: none; color: var(--clv-muted);
+  font-size: 12px; cursor: pointer; padding: 4px;
+}
+@media (max-width: 520px) {
+  .app-recommend { gap: 8px; padding: 9px 10px; }
+  .app-recommend-icon { width: 34px; height: 34px; border-radius: 9px; }
+  .app-recommend-copy span { display: none; }
+  .app-recommend-download { padding: 6px 9px; font-size: 11px; }
+}
 .avatar {
   display: inline-flex; align-items: center; justify-content: center;
   width: 32px; height: 32px; border-radius: 50%;
