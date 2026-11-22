@@ -84,7 +84,23 @@
     });
   }
 
-  function toast(msg) { alert(msg); }
+  var toastEl = null;
+  var toastTimer = 0;
+  function toast(msg) {
+    if (!document.body) return;
+    if (!toastEl) {
+      toastEl = el('div', 'clv-toast');
+      toastEl.setAttribute('role', 'status');
+      toastEl.setAttribute('aria-live', 'polite');
+      document.body.appendChild(toastEl);
+    }
+    toastEl.textContent = msg || '';
+    toastEl.classList.remove('is-show');
+    void toastEl.offsetWidth;
+    requestAnimationFrame(function () { toastEl.classList.add('is-show'); });
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toastEl.classList.remove('is-show'); }, 2600);
+  }
 
   /* ---------------- 开屏画面：每次会话首次进入显示约 1.5 秒 ---------------- */
 
@@ -114,7 +130,8 @@
     try {
       localStorage.setItem('clv_notice_' + bar.dataset.nid + '_' + new Date().toDateString(), '1');
     } catch (e) { /* 隐私模式下忽略 */ }
-    bar.remove();
+    bar.classList.add('is-hiding');
+    setTimeout(function () { bar.remove(); }, 180);
   };
 
   /* ---------------- 投币支持：1/2 枚、上滑/点击投币、砖块闪电动画 ---------------- */

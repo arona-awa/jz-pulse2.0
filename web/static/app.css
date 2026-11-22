@@ -1301,7 +1301,8 @@ body.has-capsule-nav .fab { bottom: calc(82px + env(safe-area-inset-bottom)); }
 .food-tags span {
   display: inline-flex; padding: 7px 14px; border-radius: 999px;
   border: 1px solid var(--clv-border); background: var(--clv-card);
-  color: var(--clv-muted); font-size: 13px; transition: all .18s;
+  color: var(--clv-muted); font-size: 13px;
+  transition: color .18s ease, background-color .18s ease, border-color .18s ease;
 }
 .food-tags input:checked + span {
   color: #fff; border-color: transparent;
@@ -2145,4 +2146,192 @@ body.tip-open { overflow: hidden; }
 @media (max-width: 600px) {
   .tip-options.is-coin-1 .tip-option[data-coins="2"] { left: calc(50% + 111px); }
   .tip-options.is-coin-2 .tip-option[data-coins="1"] { left: calc(50% - 111px); }
+}
+
+/* ===================================================================
+   Motion refinement
+   统一交互反馈、弹层入场与触屏行为；不改页面结构。
+   =================================================================== */
+:root {
+  --clv-ease-out: cubic-bezier(.23, 1, .32, 1);
+  --clv-ease-in-out: cubic-bezier(.77, 0, .175, 1);
+  --clv-motion-fast: 140ms;
+  --clv-motion-ui: 180ms;
+  --clv-motion-modal: 220ms;
+}
+
+/* 按钮：明确过渡属性，避免 transition: all 带来的隐式布局动画 */
+.btn {
+  transition:
+    background-color var(--clv-motion-ui) ease,
+    color var(--clv-motion-ui) ease,
+    border-color var(--clv-motion-ui) ease,
+    filter var(--clv-motion-ui) ease,
+    transform var(--clv-motion-fast) var(--clv-ease-out);
+}
+.btn:active,
+.mini-btn:active,
+.chip:active,
+.chip-toggle:active,
+.capsule-item:active,
+.act:active,
+.icon-btn:active,
+.tip-close:active,
+.tip-nav:active,
+.notice-close:active,
+.app-recommend-download:active,
+.app-recommend-close:active,
+.about-app-download:active,
+.card-styles button:active,
+.fab:active {
+  transform: scale(.96);
+}
+.act { transition: transform var(--clv-motion-fast) var(--clv-ease-out); }
+.mini-btn, .chip, .chip-toggle {
+  transition:
+    background-color var(--clv-motion-ui) ease,
+    border-color var(--clv-motion-ui) ease,
+    color var(--clv-motion-ui) ease,
+    transform var(--clv-motion-fast) var(--clv-ease-out);
+}
+.capsule-item {
+  transition:
+    background-color var(--clv-motion-ui) ease,
+    color var(--clv-motion-ui) ease,
+    box-shadow var(--clv-motion-ui) ease,
+    transform var(--clv-motion-fast) var(--clv-ease-out);
+}
+.app-recommend-download,
+.about-app-download {
+  transition:
+    transform var(--clv-motion-fast) var(--clv-ease-out),
+    box-shadow var(--clv-motion-ui) ease,
+    filter var(--clv-motion-ui) ease;
+}
+
+/* 卡片悬浮只对鼠标生效，避免触屏 tap 后 hover 粘住 */
+.post-card { transition: transform var(--clv-motion-ui) var(--clv-ease-out); }
+@media (hover: hover) and (pointer: fine) {
+  .post-card:hover { transform: translateY(-2px); }
+  .btn:hover { filter: brightness(.97); }
+}
+@media (hover: none) {
+  .post-card:hover { transform: none; }
+  .btn:hover { filter: none; }
+}
+
+/* 公告与弹层：从轻微位移/缩放进入，而不是从 scale(0) 或生硬显示 */
+.notice-bar {
+  animation: clv-fade-down var(--clv-motion-modal) var(--clv-ease-out);
+  transition: opacity var(--clv-motion-ui) ease, transform var(--clv-motion-ui) var(--clv-ease-out);
+}
+.notice-bar.is-hiding {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+.modal:not([hidden]) .modal-mask,
+.avatar-modal:not([hidden]) {
+  animation: clv-fade-in var(--clv-motion-ui) var(--clv-ease-out);
+}
+.modal:not([hidden]) .modal-box,
+.avatar-modal:not([hidden]) .avatar-dialog {
+  animation: clv-pop-in var(--clv-motion-modal) var(--clv-ease-out);
+}
+.avatar-modal {
+  transition: opacity var(--clv-motion-ui) ease;
+}
+.tip-backdrop {
+  animation: clv-fade-in var(--clv-motion-ui) var(--clv-ease-out);
+}
+.tip-sheet {
+  animation: tip-sheet-in var(--clv-motion-modal) var(--clv-ease-out);
+}
+@keyframes clv-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes clv-fade-down {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes clv-pop-in {
+  from { opacity: 0; transform: translateY(6px) scale(.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* 点赞成功时给图标一次短促反馈 */
+.like-btn.liked svg {
+  animation: clv-like-pop 280ms var(--clv-ease-out);
+  transform-origin: center;
+}
+@keyframes clv-like-pop {
+  0% { transform: scale(.86); }
+  55% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+/* 非阻塞 Toast：替代 alert 的阻塞式反馈 */
+.clv-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(88px + env(safe-area-inset-bottom));
+  z-index: 300;
+  width: max-content;
+  max-width: min(420px, calc(100vw - 24px));
+  padding: 10px 16px;
+  border: 1px solid var(--clv-border);
+  border-radius: 12px;
+  background: var(--clv-card);
+  color: var(--clv-text);
+  box-shadow: 0 12px 32px -12px rgba(0, 0, 0, .35);
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, 10px) scale(.98);
+  transition:
+    opacity var(--clv-motion-ui) var(--clv-ease-out),
+    transform var(--clv-motion-modal) var(--clv-ease-out);
+}
+.clv-toast.is-show {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+}
+
+/* 食物标签的颜色过渡，替换 transition: all */
+.food-tags span {
+  transition:
+    color var(--clv-motion-ui) ease,
+    background-color var(--clv-motion-ui) ease,
+    border-color var(--clv-motion-ui) ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notice-bar,
+  .modal:not([hidden]) .modal-mask,
+  .modal:not([hidden]) .modal-box,
+  .avatar-modal:not([hidden]),
+  .avatar-modal:not([hidden]) .avatar-dialog,
+  .tip-backdrop,
+  .tip-sheet,
+  .like-btn.liked svg {
+    animation: none !important;
+  }
+  .post-card,
+  .btn,
+  .mini-btn,
+  .chip,
+  .chip-toggle,
+  .capsule-item,
+  .act,
+  .app-recommend-download,
+  .about-app-download,
+  .food-tags span {
+    transition-duration: .01ms !important;
+  }
+  .clv-toast {
+    transform: translate(-50%, 0);
+    transition: opacity 150ms ease;
+  }
 }
